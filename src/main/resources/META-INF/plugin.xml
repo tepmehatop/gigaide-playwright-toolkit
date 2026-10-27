@@ -10,6 +10,10 @@
           fixtures from <code>test.extend</code>, Page Object methods and fields, local object properties, imports, JSON.</li>
       <li><b>Playwright Test</b> run configuration with Run/Debug gutter icons next to <code>test(...)</code> and
           <code>test.describe(...)</code>.</li>
+      <li><b>Test tree</b> in Run and Debug: statuses, clickable stacks and attachments, expected/actual diff,
+          Rerun Failed Tests; trace, screenshots and playwright-extended-report from the tree.</li>
+      <li><b>Show Browser</b> (one browser kept open between runs) and <b>Explore locators</b>
+          (the locator under the caret is highlighted in that browser).</li>
       <li><b>Debugging with breakpoints</b> in tests, fixtures and Page Objects (via vscode-js-debug, shipped with GigaIDE):
           stepping, variables, watches, Evaluate Expression, conditional breakpoints.</li>
     </ul>

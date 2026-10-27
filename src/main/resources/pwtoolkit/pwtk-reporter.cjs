@@ -71,13 +71,19 @@ function location(file, line) {
   return line ? `pwtest://${file}:${line}` : `pwtest://${file}`;
 }
 
+/** Paths relative to the project (shorter, clickable against the working directory, no user names in screenshots). */
+let projectDir;
+function relativize(text) {
+  return projectDir ? String(text).split(projectDir + path.sep).join('') : String(text);
+}
+
 /** First line of the error and the "Expected:/Received:" pair, if any (for the IDE diff viewer). */
 function describeError(error) {
-  const text = String(error?.message ?? error?.value ?? 'Test failed').replace(ANSI, '');
+  const text = relativize(String(error?.message ?? error?.value ?? 'Test failed').replace(ANSI, ''));
   const first = text.split('\n').find(l => l.trim()) ?? 'Test failed';
   const expected = /^\s*Expected(?: [a-z ]+)?:\s?(.*)$/mi.exec(text);
   const received = /^\s*Received(?: [a-z ]+)?:\s?(.*)$/mi.exec(text);
-  const stack = String(error?.stack ?? '').replace(ANSI, '');
+  const stack = relativize(String(error?.stack ?? '').replace(ANSI, ''));
   let details = stack.includes(first) ? stack : [text, stack].filter(Boolean).join('\n');
   // the IDE prints the message above the details: do not repeat it
   const lines = details.split('\n');
@@ -100,6 +106,7 @@ class PlaywrightToolkitReporter {
 
   onBegin(config, suite) {
     this.rootDir = config.rootDir;
+    projectDir = config.configFile ? path.dirname(config.configFile) : process.cwd();
     this.history = loadHistory(config.configFile ? path.dirname(config.configFile) : process.cwd());
     message('enteredTheMatrix', {});
     message('testingStarted', {});
@@ -165,7 +172,7 @@ class PlaywrightToolkitReporter {
       project: test.parent?.project()?.name,
       status: result.status, retry: result.retry, attachments,
     };
-    for (const a of attachments) message('testStdOut', { nodeId: test.id, out: `${a.name}: ${a.path}\n` });
+    for (const a of attachments) message('testStdOut', { nodeId: test.id, out: `${a.name}: ${relativize(a.path)}\n` });
 
     const willRetry = result.status !== 'passed' && result.status !== 'skipped' && result.retry < test.retries;
     if (!willRetry) {

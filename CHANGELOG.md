@@ -1,6 +1,13 @@
 # Changelog
 
-## 1.2.0
+## 1.3.0
+
+- **Explore locators**: при открытом Show Browser локатор под курсором подсвечивается в браузере — селекторы Page Object, `page.locator(...)`/`getByRole(...)`, `mainPage.selectors.x` (значение находит TypeScript 7); на паузе отладчика выражение вычисляется в кадре. Действия не выполняются.
+- Значок запуска через tsx/node:test от плагина NodeJS GigaIDE скрыт в Playwright-тестах (ошибка «tsx binary not found»).
+- Пути в ошибках и вложениях — относительно проекта.
+- Руководство пользователя со скриншотами: [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
+
+## 1.2.0 (не выпускалась отдельно, вошла в 1.3.0)
 
 - **Дерево тестов** в окнах Run и Debug: файл → describe → тест, ✓/✗/⊘ и время, переход к коду по двойному клику, кликабельный стек и вложения, сравнение expected/actual. Репортер подключается через `PW_TEST_REPORTER`, поэтому `html` и `playwright-extended-report` из `playwright.config` продолжают генерироваться.
 - Результат последнего прогона — значками у `test(` в gutter; кнопка **Rerun Failed Tests**.

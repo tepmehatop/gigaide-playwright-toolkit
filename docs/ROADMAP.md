@@ -55,7 +55,7 @@
 - Как `reusedBrowser.ts` в playwright-vscode: IDE держит фоновый `playwright run-server` и передаёт тестам `PW_TEST_CONNECT_WS_ENDPOINT` + `PW_TEST_REUSE_CONTEXT=1`. Окно браузера не закрывается между прогонами, видно, где остановился тест.
 - Кнопка «Close browser» в тулбаре. Основа для 2.2.
 
-**2.2. Explore locators**
+**2.2. Explore locators** ✅ (1.3.0)
 - Пока отладчик на паузе, курсор на `page.locator(...)`, `getByRole(...)` или `mainPage.selectors.heroSection` → элемент подсвечивается в браузере, рядом с кодом — сколько элементов найдено.
 - Как `debugHighlight.ts`: плагин вычисляет выражение локатора в кадре отладчика (`evaluate` — только строка селектора, без async-вызовов) и отправляет его в переиспользуемый браузер (`locator.highlight()`).
 - Без паузы (просто в редакторе) — подсветка в открытом браузере по наведению на селектор из `selectors` Page Object.

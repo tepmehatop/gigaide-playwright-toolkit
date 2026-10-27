@@ -1,5 +1,7 @@
 # Playwright Toolkit for GigaIDE
 
+📖 **[Руководство пользователя со скриншотами](docs/USER_GUIDE.md)**
+
 Плагин для **GigaIDE 2026.1** (и других IDE на платформе IntelliJ 2025.1+ без коммерческого JavaScript-плагина) для тех, кто пишет автотесты на **Playwright + TypeScript/JavaScript**.
 
 ## Возможности
@@ -11,6 +13,7 @@
 - **Параметры прогона**: `--project` из конфига, `--grep`/`--grep-invert` с автодополнением `@tag`, retries, `--repeat-each`, `--max-failures`, workers, `--last-failed`, `--trace`.
 - **Trace, вложения и отчёт** у упавшего теста (контекстное меню дерева): Open Trace, Open Screenshot / Attachment, Open in Report. История прогонов из playwright-extended-report — в выводе теста.
 - **Show Browser**: один видимый браузер не закрывается между прогонами, как в VS Code (Tools → Playwright).
+- **Explore locators**: локатор под курсором подсвечивается в этом браузере (селекторы Page Object, `page.locator`/`getByRole`, на паузе отладчика — любые выражения).
 - **Tools → Playwright**: Show Report, Codegen, Install Browsers, Check Environment.
 - **Шаблоны кода**: `pwt` (тест), `pwd` (describe), `pwstep`, `pwbe` (beforeEach), `pwexp`, `pwloc`, `pwfix` (фикстура), `pwpage` (Page Object).
 - **Отладка с брейкпоинтами** в тестах, фикстурах и Page Object: step over/into/out, переменные, watches, Evaluate Expression, условные брейкпоинты, Run to Cursor.
