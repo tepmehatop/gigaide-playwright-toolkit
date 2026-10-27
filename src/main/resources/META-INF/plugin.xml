@@ -10,6 +10,10 @@
           fixtures from <code>test.extend</code>, Page Object methods and fields, local object properties, imports, JSON.</li>
       <li><b>Playwright Test</b> run configuration with Run/Debug gutter icons next to <code>test(...)</code> and
           <code>test.describe(...)</code>.</li>
+      <li><b>Test tree</b> in Run and Debug: statuses, clickable stacks and attachments, expected/actual diff,
+          Rerun Failed Tests; trace, screenshots and playwright-extended-report from the tree.</li>
+      <li><b>Show Browser</b> (one browser kept open between runs) and <b>Explore locators</b>
+          (the locator under the caret is highlighted in that browser).</li>
       <li><b>Debugging with breakpoints</b> in tests, fixtures and Page Objects (via vscode-js-debug, shipped with GigaIDE):
           stepping, variables, watches, Evaluate Expression, conditional breakpoints.</li>
     </ul>
@@ -32,14 +36,42 @@
         <applicationConfigurable parentId="tools" instance="dev.pwtoolkit.settings.PwConfigurable"
                                  id="dev.pwtoolkit.settings" displayName="Playwright Toolkit"/>
         <additionalTextAttributes scheme="Darcula" file="colorSchemes/PwToolkitDarcula.xml"/>
+        <liveTemplateContext contextId="PLAYWRIGHT" implementation="dev.pwtoolkit.templates.PwTemplateContextType"/>
+        <defaultLiveTemplates file="/liveTemplates/Playwright.xml"/>
         <notificationGroup id="Playwright Toolkit" displayType="BALLOON"/>
     </extensions>
 
     <actions>
-        <action id="dev.pwtoolkit.DiagnoseHighlighting" class="dev.pwtoolkit.nav.HighlightingDiagnosticsAction"
-                text="Playwright Toolkit: Diagnose Highlighting"
-                description="Copy all highlighters of the caret line (layers, keys, colors) for troubleshooting">
+        <group id="dev.pwtoolkit.TestTreeActions">
+            <separator/>
+            <action id="dev.pwtoolkit.OpenTrace" class="dev.pwtoolkit.tests.PwTestTreeActions$OpenTrace"
+                    text="Open Trace" description="Open the trace of this test in Playwright Trace Viewer"/>
+            <action id="dev.pwtoolkit.OpenAttachment" class="dev.pwtoolkit.tests.PwTestTreeActions$OpenAttachment"
+                    text="Open Screenshot / Attachment..." description="Screenshots, video, error context of this test"/>
+            <action id="dev.pwtoolkit.OpenInReport" class="dev.pwtoolkit.tests.PwTestTreeActions$OpenInReport"
+                    text="Open in Report" description="Open this test in playwright-extended-report (or the HTML report)"/>
+            <add-to-group group-id="TestTreePopupMenu" anchor="last"/>
+        </group>
+        <group id="dev.pwtoolkit.ToolsMenu" text="Playwright" popup="true">
+            <action id="dev.pwtoolkit.ReuseBrowser" class="dev.pwtoolkit.run.PwBrowserActions$ToggleReuse"
+                    text="Show Browser (Keep Open Between Runs)" description="Run and debug tests in one visible browser that stays open"/>
+            <action id="dev.pwtoolkit.CloseBrowser" class="dev.pwtoolkit.run.PwBrowserActions$Close"
+                    text="Close Browser" description="Close the browser kept open between runs"/>
+            <separator/>
+            <action id="dev.pwtoolkit.ShowReport" class="dev.pwtoolkit.tests.PwToolsActions$ShowReport"
+                    text="Show Report" description="Open playwright-extended-report or the Playwright HTML report"/>
+            <action id="dev.pwtoolkit.Codegen" class="dev.pwtoolkit.tests.PwToolsActions$Codegen"
+                    text="Record New Test (Codegen)..." description="Record browser actions as Playwright code"/>
+            <action id="dev.pwtoolkit.InstallBrowsers" class="dev.pwtoolkit.tests.PwToolsActions$InstallBrowsers"
+                    text="Install Browsers" description="playwright install for the project's Playwright version"/>
+            <action id="dev.pwtoolkit.CheckEnvironment" class="dev.pwtoolkit.tests.PwToolsActions$CheckEnvironment"
+                    text="Check Environment" description="Node.js, Playwright, browsers, TypeScript 7, js-debug"/>
             <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </group>
+        <action id="dev.pwtoolkit.DiagnoseHighlighting" class="dev.pwtoolkit.nav.HighlightingDiagnosticsAction"
+                text="Diagnose Highlighting"
+                description="Copy all highlighters of the caret line (layers, keys, colors) for troubleshooting">
+            <add-to-group group-id="dev.pwtoolkit.ToolsMenu" anchor="last"/>
         </action>
     </actions>
 

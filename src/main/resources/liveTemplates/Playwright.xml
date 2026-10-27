@@ -1,0 +1,54 @@
+<templateSet group="Playwright">
+  <template name="pwt" value="test(&quot;$NAME$&quot;, async ({ page$FIXTURES$ }) =&gt; {&#10;    $END$&#10;});" description="Playwright test" toReformat="false" toShortenFQNames="false">
+    <variable name="NAME" expression="" defaultValue="&quot;test name&quot;" alwaysStopAt="true"/>
+    <variable name="FIXTURES" expression="" defaultValue="&quot;&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="pwd" value="test.describe(&quot;$NAME$&quot;, () =&gt; {&#10;    $END$&#10;});" description="Playwright test.describe" toReformat="false" toShortenFQNames="false">
+    <variable name="NAME" expression="" defaultValue="&quot;suite name&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="pwstep" value="await test.step(&quot;$NAME$&quot;, async () =&gt; {&#10;    $END$&#10;});" description="await test.step(...)" toReformat="false" toShortenFQNames="false">
+    <variable name="NAME" expression="" defaultValue="&quot;step name&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="pwbe" value="test.beforeEach(async ({ page$FIXTURES$ }) =&gt; {&#10;    $END$&#10;});" description="test.beforeEach" toReformat="false" toShortenFQNames="false">
+    <variable name="FIXTURES" expression="" defaultValue="&quot;&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="pwexp" value="await expect(page.locator($LOCATOR$)).$ASSERT$($END$);" description="await expect(locator) assertion" toReformat="false" toShortenFQNames="false">
+    <variable name="LOCATOR" expression="" defaultValue="&quot;&quot;" alwaysStopAt="true"/>
+    <variable name="ASSERT" expression="enum(&quot;toBeVisible&quot;, &quot;toHaveText&quot;, &quot;toContainText&quot;, &quot;toHaveCount&quot;, &quot;toHaveValue&quot;, &quot;toBeEnabled&quot;, &quot;toBeHidden&quot;)" defaultValue="&quot;toBeVisible&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="pwloc" value="page.locator(&quot;$SELECTOR$&quot;)$END$" description="page.locator(...)" toReformat="false" toShortenFQNames="false">
+    <variable name="SELECTOR" expression="" defaultValue="&quot;&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="pwfix" value="$NAME$: async ({ page }, use) =&gt; { await use(new $CLASS$(page)) },$END$" description="Fixture for test.extend (Page Object)" toReformat="false" toShortenFQNames="false">
+    <variable name="NAME" expression="" defaultValue="&quot;mainPage&quot;" alwaysStopAt="true"/>
+    <variable name="CLASS" expression="" defaultValue="&quot;MainPage&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="pwpage" value="import { Page } from &quot;@playwright/test&quot;;&#10;&#10;export default class $CLASS$ {&#10;    private page: Page;&#10;    path = &quot;$PATH$&quot;;&#10;&#10;    constructor(page: Page) {&#10;        this.page = page;&#10;    }&#10;&#10;    selectors = {&#10;        $END$&#10;    }&#10;&#10;    public async open() {&#10;        await this.page.goto(this.path);&#10;    }&#10;}" description="Page Object class (selectors, path, open)" toReformat="false" toShortenFQNames="false">
+    <variable name="CLASS" expression="" defaultValue="&quot;MainPage&quot;" alwaysStopAt="true"/>
+    <variable name="PATH" expression="" defaultValue="&quot;/&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+</templateSet>

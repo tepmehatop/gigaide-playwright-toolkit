@@ -26,7 +26,15 @@ public record PwLaunchSpec(@NotNull String node,
                            @NotNull Map<String, String> env,
                            boolean passParentEnv) {
 
+    /** Where the reporter writes attachments (screenshots, traces) of the run, for the IDE actions. */
+    public static final String RESULTS_FILE_ENV = "PWTK_RESULTS_FILE";
+
     public static @NotNull PwLaunchSpec create(@NotNull PwRunConfiguration config, boolean debug) throws ExecutionException {
+        return create(config, debug, true);
+    }
+
+    /** {@code startBrowser = false}: validation only, never starts the shared browser server. */
+    static @NotNull PwLaunchSpec create(@NotNull PwRunConfiguration config, boolean debug, boolean startBrowser) throws ExecutionException {
         File workDir = new File(StringUtil.notNullize(config.getWorkingDirectory()));
         if (!workDir.isDirectory()) throw new ExecutionException("Working directory does not exist: " + workDir);
 
@@ -40,28 +48,52 @@ public record PwLaunchSpec(@NotNull String node,
 
         List<String> args = new ArrayList<>();
         args.add("test");
-        String target = relativeTarget(workDir, config.getTestPath());
-        if (!target.isEmpty()) args.add(config.getTestLine() > 0 ? target + ":" + config.getTestLine() : target);
+        if (!config.getRerunTargets().isEmpty()) {
+            // "Rerun Failed Tests": the failed tests as file:line filters
+            for (String rerun : config.getRerunTargets()) args.add(relativeTarget(workDir, rerun));
+        } else {
+            String target = relativeTarget(workDir, config.getTestPath());
+            if (!target.isEmpty()) args.add(config.getTestLine() > 0 ? target + ":" + config.getTestLine() : target);
+        }
         if (!StringUtil.isEmptyOrSpaces(config.getProjectName())) args.add("--project=" + config.getProjectName().trim());
         if (!StringUtil.isEmptyOrSpaces(config.getTestName())) {
             args.add("--grep");
             args.add(config.getTestName());
         }
+        if (!StringUtil.isEmptyOrSpaces(config.getGrepInvert())) {
+            args.add("--grep-invert");
+            args.add(config.getGrepInvert());
+        }
+        if (!StringUtil.isEmptyOrSpaces(config.getRetries())) args.add("--retries=" + config.getRetries().trim());
+        if (config.getRepeatEach() > 0) args.add("--repeat-each=" + config.getRepeatEach());
+        if (config.getMaxFailures() > 0) args.add("--max-failures=" + config.getMaxFailures());
+        if (!StringUtil.isEmptyOrSpaces(config.getWorkers())) args.add("--workers=" + config.getWorkers().trim());
+        if (config.isLastFailed() && config.getRerunTargets().isEmpty()) args.add("--last-failed");
+        if (!StringUtil.isEmptyOrSpaces(config.getTraceMode())) args.add("--trace=" + config.getTraceMode().trim());
         PwSettings.StateBean settings = PwSettings.getInstance().getState();
-        if (config.isHeaded() || (debug && settings.showBrowserWhenDebugging)) args.add("--headed");
+        boolean reuseBrowser = settings.reuseBrowser;
+        if (config.isHeaded() || reuseBrowser || (debug && settings.showBrowserWhenDebugging)) args.add("--headed");
         List<String> extra = ParametersListUtil.parse(StringUtil.notNullize(config.getExtraArgs()));
         args.addAll(extra);
         Map<String, String> env = new LinkedHashMap<>();
         if (debug) {
             // one worker keeps the order predictable, no timeout lets you sit on a breakpoint
-            if (extra.stream().noneMatch(a -> a.startsWith("--workers") || a.equals("-j"))) args.add("--workers=1");
+            if (args.stream().noneMatch(a -> a.startsWith("--workers") || a.equals("-j"))) args.add("--workers=1");
             if (extra.stream().noneMatch(a -> a.startsWith("--timeout"))) args.add("--timeout=0");
             // same as the VS Code extension: `playwright` helper object in the browser DevTools console
             env.put("PWDEBUG", "console");
             if (settings.pauseOnFailure) {
-                env.put("PW_TEST_SOURCE_TRANSFORM", PwDebugTransform.install().toString());
+                env.put("PW_TEST_SOURCE_TRANSFORM", PwResources.install(PwResources.DEBUG_TRANSFORM).toString());
                 env.put("PW_TEST_SOURCE_TRANSFORM_SCOPE", transformScope(workDir, config.getTestPath()));
             }
+        }
+        // the IDE test tree: added next to the reporters of playwright.config (html, extended report...), not instead of them
+        env.put("PW_TEST_REPORTER", PwResources.install(PwResources.REPORTER).toString());
+        env.put(RESULTS_FILE_ENV, dev.pwtoolkit.tests.PwRunResults.fileFor(workDir).toString());
+        if (reuseBrowser && startBrowser) {
+            // the browser stays open between runs: the tests connect to the IDE's run-server (see PwBrowserServer)
+            env.put("PW_TEST_CONNECT_WS_ENDPOINT", PwBrowserServer.getInstance(config.getProject()).ensureStarted(workDir, node, cli));
+            env.put("PW_TEST_REUSE_CONTEXT", "1");
         }
         env.putAll(config.getEnvData().getEnvs());
         return new PwLaunchSpec(node, cli, args, workDir, env, config.getEnvData().isPassParentEnvs());
@@ -92,7 +124,7 @@ public record PwLaunchSpec(@NotNull String node,
         return FileUtil.toSystemIndependentName(relative != null ? relative : target.getPath());
     }
 
-    private static @Nullable String findCli(@NotNull Path workDir) {
+    public static @Nullable String findCli(@NotNull Path workDir) {
         for (Path dir = workDir; dir != null; dir = dir.getParent()) {
             for (String candidate : List.of("node_modules/@playwright/test/cli.js", "node_modules/playwright/cli.js")) {
                 File cli = dir.resolve(candidate).toFile();

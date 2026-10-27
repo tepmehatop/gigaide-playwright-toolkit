@@ -6,6 +6,7 @@ export default defineConfig({
   use: {
     browserName: 'chromium',
     headless: true,
+    screenshot: 'only-on-failure',
   },
   projects: [
     { name: 'offline' },

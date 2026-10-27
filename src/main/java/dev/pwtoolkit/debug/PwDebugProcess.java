@@ -25,6 +25,7 @@ import com.intellij.xdebugger.breakpoints.XLineBreakpoint;
 import com.intellij.xdebugger.evaluation.XDebuggerEditorsProvider;
 import com.intellij.xdebugger.frame.XSuspendContext;
 import dev.pwtoolkit.run.PwLaunchSpec;
+import dev.pwtoolkit.tests.PwTestConsoleProperties;
 import dev.pwtoolkit.settings.PwSettings;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -55,6 +56,8 @@ public final class PwDebugProcess extends XDebugProcess {
     private static final String READY_MARKER = "Debug server listening at";
 
     private final PwLaunchSpec spec;
+    /** When set, the Debug tab shows the Playwright test tree (same as Run) instead of a plain console. */
+    private final @Nullable PwTestConsoleProperties testProperties;
     private final PwDebugProcessHandler processHandler = new PwDebugProcessHandler(this::stopAsync0);
     private final XBreakpointHandler<?>[] breakpointHandlers;
     /** Breakpoints per file path; a key stays (with an empty list) so later setBreakpoints clear removed ones. */
@@ -74,8 +77,13 @@ public final class PwDebugProcess extends XDebugProcess {
     }
 
     PwDebugProcess(@NotNull XDebugSession session, @NotNull PwLaunchSpec spec) {
+        this(session, spec, null);
+    }
+
+    PwDebugProcess(@NotNull XDebugSession session, @NotNull PwLaunchSpec spec, @Nullable PwTestConsoleProperties testProperties) {
         super(session);
         this.spec = spec;
+        this.testProperties = testProperties;
         List<XBreakpointHandler<?>> handlers = new ArrayList<>();
         handlers.add(new PwBreakpointHandler(PwLineBreakpointType.class, this));
         // GigaIDE's own JavaScript Debugger plugin (if enabled) has a line breakpoint type too: honour those as well
@@ -103,6 +111,16 @@ public final class PwDebugProcess extends XDebugProcess {
     /** The platform does not connect the default debug console to the process: do it, or Playwright's output is lost. */
     @Override
     public @NotNull com.intellij.execution.ui.ExecutionConsole createConsole() {
+        if (testProperties != null) {
+            try {
+                var console = com.intellij.execution.testframework.sm.SMTestRunnerConnectionUtil.createAndAttachConsole(
+                        PwTestConsoleProperties.FRAMEWORK, processHandler, testProperties);
+                console.addMessageFilter(testProperties.createLinkFilter());
+                return console;
+            } catch (com.intellij.execution.ExecutionException e) {
+                LOG.warn("Cannot create the test tree console", e);
+            }
+        }
         com.intellij.execution.ui.ConsoleView console = com.intellij.execution.filters.TextConsoleBuilderFactory.getInstance()
                 .createBuilder(getSession().getProject()).getConsole();
         console.attachToProcess(processHandler);
@@ -326,6 +344,34 @@ public final class PwDebugProcess extends XDebugProcess {
         JsonArray array = new JsonArray();
         values.forEach(array::add);
         return array;
+    }
+
+    /**
+     * Explore locators while paused: evaluates a locator expression (side-effect free, see PwLocatorExpressions) in the
+     * selected frame and returns locator code for the highlight ({@code locator('h1')}), or null.
+     */
+    public @Nullable String evaluateLocator(@NotNull String expression) {
+        if (!(getSession().getSuspendContext() instanceof PwSuspendContext context)) return null;
+        PwExecutionStack stack = context.getActiveExecutionStack();
+        com.intellij.xdebugger.frame.XStackFrame current = getSession().getCurrentStackFrame();
+        int frameId = current instanceof PwStackFrame frame ? frame.frameId()
+                : stack.getTopFrame() instanceof PwStackFrame top ? top.frameId() : -1;
+        if (frameId < 0) return null;
+        String js = "(() => { try { const v = (" + expression + "); "
+                + "if (typeof v === 'string') return \"locator('\" + v.replace(/\\\\/g, '\\\\\\\\').replace(/'/g, \"\\\\'\") + \"')\"; "
+                + "if (v && typeof v._selector === 'string') return String(v); return ''; } catch (e) { return ''; } })()";
+        try {
+            JsonObject result = stack.session.connection.request("evaluate",
+                    Map.of("expression", js, "frameId", frameId, "context", "clipboard")).get(5, TimeUnit.SECONDS);
+            String value = result.has("result") ? result.get("result").getAsString().strip() : "";
+            // js-debug wraps strings that contain ' in double quotes, even in the "clipboard" context
+            if (value.length() >= 2 && value.startsWith("\"") && value.endsWith("\"")) {
+                value = new com.google.gson.Gson().fromJson(value, String.class);
+            }
+            return value.isBlank() || value.equals("''") ? null : value;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     static @NotNull String errorMessage(@NotNull Throwable error) {

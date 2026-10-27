@@ -50,7 +50,7 @@ intellijPlatform {
     buildSearchableOptions = false
     instrumentCode = false
     pluginConfiguration {
-        changeNotes = "First release: TypeScript 7 navigation and semantic highlighting, Playwright Test run/debug configuration with breakpoints, pause on failed step, GigaIDE Jest marker workaround."
+        changeNotes = "Test tree for Run and Debug, run options, trace/attachments/report from the tree, Show Browser and Explore locators, Tools | Playwright menu, live templates. See docs/USER_GUIDE.md."
         ideaVersion {
             sinceBuild = "251"
             untilBuild = provider { null }
@@ -67,5 +67,6 @@ tasks.test {
     // integration tests use the sample project in samples/playwright-offline (run `npm install` there first)
     systemProperty("pwtoolkit.sample", file("samples/playwright-offline").absolutePath)
     providers.systemProperty("pwtoolkit.report.file").orNull?.let { systemProperty("pwtoolkit.report.file", it) }
+    providers.systemProperty("pwtoolkit.docs.dir").orNull?.let { systemProperty("pwtoolkit.docs.dir", it) }
     testLogging { events("passed", "failed", "skipped"); exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL; showStandardStreams = true }
 }

@@ -22,7 +22,10 @@ public final class PwTestLineMarkerContributor extends RunLineMarkerContributor 
         if (document == null) return null;
         PwTestDetector.TestCall call = PwTestDetector.parseCall(document, element.getTextRange().getStartOffset());
         if (call == null) return null;
-        return new Info(call.suite() ? AllIcons.RunConfigurations.TestState.Run_run : AllIcons.RunConfigurations.TestState.Run,
+        // ✓/✗ of the last run, recorded by the test tree under the same pwtest:// URL the reporter prints
+        String url = dev.pwtoolkit.tests.PwTestLocator.url(file.getVirtualFile().getPath(), call.line() + 1);
+        javax.swing.Icon icon = getTestStateIcon(url, element.getProject(), call.suite());
+        return new Info(icon,
                 ExecutorAction.getActions(0), e -> "Run/Debug '" + call.title() + "'");
     }
 }

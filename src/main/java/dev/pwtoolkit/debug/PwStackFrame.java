@@ -44,6 +44,10 @@ final class PwStackFrame extends XStackFrame {
         this.subtle = "label".equals(hint) || "subtle".equals(hint) || "deemphasize".equals(sourceHint);
     }
 
+    int frameId() {
+        return frameId;
+    }
+
     @Override
     public @Nullable XSourcePosition getSourcePosition() {
         if (!positionResolved) {

@@ -1,5 +1,7 @@
 # Playwright Toolkit for GigaIDE
 
+📖 **[Руководство пользователя со скриншотами](docs/USER_GUIDE.md)**
+
 Плагин для **GigaIDE 2026.1** (и других IDE на платформе IntelliJ 2025.1+ без коммерческого JavaScript-плагина) для тех, кто пишет автотесты на **Playwright + TypeScript/JavaScript**.
 
 ## Возможности
@@ -7,6 +9,13 @@
 - **Go to Declaration (Cmd/Ctrl+Click)** для TS/JS: фикстуры из `test.extend<...>`, методы и поля Page Object, свойства локальных объектов, импорты, JSON.
 - **Семантическая подсветка в тестах** (цвета WebStorm): `test`/`expect`, методы и поля Page Object, имена в `import`; радужные скобки; параметры — через Semantic highlighting в Language Defaults.
 - **Run/Debug из gutter** у `test(...)` и `test.describe(...)`, запуск файла или папки из дерева проекта, «тест под курсором». Конфигурация **Playwright Test**: `--project`, `--grep`, доп. аргументы, env, `--headed`.
+- **Дерево тестов** в окнах Run и Debug: статусы, время, переход к коду, кликабельный стек и вложения, expected/actual, **Rerun Failed Tests**, результат последнего прогона у `test(` в gutter.
+- **Параметры прогона**: `--project` из конфига, `--grep`/`--grep-invert` с автодополнением `@tag`, retries, `--repeat-each`, `--max-failures`, workers, `--last-failed`, `--trace`.
+- **Trace, вложения и отчёт** у упавшего теста (контекстное меню дерева): Open Trace, Open Screenshot / Attachment, Open in Report. История прогонов из playwright-extended-report — в выводе теста.
+- **Show Browser**: один видимый браузер не закрывается между прогонами, как в VS Code (Tools → Playwright).
+- **Explore locators**: локатор под курсором подсвечивается в этом браузере (селекторы Page Object, `page.locator`/`getByRole`, на паузе отладчика — любые выражения).
+- **Tools → Playwright**: Show Report, Codegen, Install Browsers, Check Environment.
+- **Шаблоны кода**: `pwt` (тест), `pwd` (describe), `pwstep`, `pwbe` (beforeEach), `pwexp`, `pwloc`, `pwfix` (фикстура), `pwpage` (Page Object).
 - **Отладка с брейкпоинтами** в тестах, фикстурах и Page Object: step over/into/out, переменные, watches, Evaluate Expression, условные брейкпоинты, Run to Cursor.
 - **Пауза на упавшем шаге** (как в VS Code): при падении `expect` или локатора отладчик останавливается на этой строке, текст ошибки выводится в консоль.
 - При дебаге браузер открывается в видимом режиме, таймауты отключены, в DevTools браузера доступен объект `playwright`.
@@ -32,6 +41,12 @@
 - **Запуск:** ▶ у `test(` или `test.describe(` → *Run* / *Debug*. Правый клик в теле теста → запустить этот тест. Правый клик по файлу или папке в дереве проекта → запустить все тесты в нём.
 - **Брейкпоинты:** клик по gutter в любом `.ts`/`.js`-файле.
 - **Настройки:** *Settings → Tools → Playwright Toolkit* — пути к Node, TypeScript 7 и js-debug; навигация и подсветка; браузер и пауза на ошибке при дебаге; обход Jest-маркера.
+
+## Связка с playwright-extended-report
+
+- **Open in Report** у теста в дереве запускает `pw-extended-report show` и открывает страницу этого теста (`#?testId=…`). Если пакет не установлен, открывается стандартный HTML-отчёт (`playwright show-report`) на главной странице.
+- **История**: если в отчёте включена история (`insights: { history: {} }`), плагин читает `extended-report-history.json` (или `EXTENDED_REPORT_HISTORY_FILE`) и пишет её в вывод теста.
+- **«Открыть в IDE» из отчёта прямо в GigaIDE**: в ⚙ отчёта выберите свой шаблон URL `http://localhost:63342/api/file/{path}:{line}` — это встроенный сервер GigaIDE, консольный лаунчер не нужен.
 
 ## Как это устроено
 

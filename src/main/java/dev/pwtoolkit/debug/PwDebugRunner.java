@@ -15,6 +15,7 @@ import com.intellij.xdebugger.XDebugSession;
 import com.intellij.xdebugger.XDebuggerManager;
 import dev.pwtoolkit.run.PwLaunchSpec;
 import dev.pwtoolkit.run.PwRunConfiguration;
+import dev.pwtoolkit.tests.PwTestConsoleProperties;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -34,11 +35,13 @@ public final class PwDebugRunner extends GenericProgramRunner<RunnerSettings> {
     protected @Nullable RunContentDescriptor doExecute(@NotNull RunProfileState state, @NotNull ExecutionEnvironment environment)
             throws ExecutionException {
         FileDocumentManager.getInstance().saveAllDocuments();
-        PwLaunchSpec spec = PwLaunchSpec.create((PwRunConfiguration) environment.getRunProfile(), true);
+        PwRunConfiguration config = (PwRunConfiguration) environment.getRunProfile();
+        PwLaunchSpec spec = PwLaunchSpec.create(config, true);
+        PwTestConsoleProperties testProperties = new PwTestConsoleProperties(config, environment.getExecutor());
         XDebugProcessStarter starter = new XDebugProcessStarter() {
             @Override
             public @NotNull XDebugProcess start(@NotNull XDebugSession session) {
-                return new PwDebugProcess(session, spec);
+                return new PwDebugProcess(session, spec, testProperties);
             }
         };
         XDebuggerManager manager = XDebuggerManager.getInstance(environment.getProject());
