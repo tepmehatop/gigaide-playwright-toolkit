@@ -29,6 +29,44 @@ function message(name, attributes) {
   process.stdout.write(`\n##teamcity[${name} ${attrs}]\n`);
 }
 
+/**
+ * Run history of playwright-extended-report (insights.history): EXTENDED_REPORT_HISTORY_FILE or
+ * extended-report-history.json next to the report folder. Read-only: the extended report maintains it.
+ */
+function loadHistory(configDir) {
+  const candidates = [
+    process.env.EXTENDED_REPORT_HISTORY_FILE,
+    configDir && path.join(configDir, 'extended-report-history.json'),
+    configDir && path.join(configDir, 'extended-report', 'history.json'),
+  ].filter(Boolean);
+  for (const file of candidates) {
+    try {
+      const data = JSON.parse(fs.readFileSync(file, 'utf-8'));
+      if (data && Array.isArray(data.runs)) return data.runs;
+    } catch {
+    }
+  }
+  return [];
+}
+
+const OUTCOME_ICON = { p: '✓', f: '✗', k: '~', s: '-' };
+
+/** "History (last 5 runs): ✓✓✗✓✗ — failed 2 of 5, new failure" for a finished test, or undefined. */
+function describeHistory(runs, testId, failedNow) {
+  const outcomes = runs.map(r => r.tests && r.tests[testId]).filter(Boolean).map(t => t[0]);
+  if (!outcomes.length) return undefined;
+  const executed = outcomes.filter(o => o !== 's');
+  const failed = executed.filter(o => o === 'f').length;
+  const flaky = executed.filter(o => o === 'k').length;
+  const notes = [`failed ${failed} of ${executed.length}`];
+  if (flaky) notes.push(`flaky ${flaky}`);
+  if (failedNow && executed.length && executed.every(o => o === 'p')) notes.push('NEW failure');
+  let streak = 0;
+  for (let i = executed.length - 1; i >= 0 && executed[i] === 'f'; i--) streak++;
+  if (failedNow && streak) notes.push(`failing ${streak + 1} runs in a row`);
+  return `History (previous ${outcomes.length} runs, extended report): ${outcomes.map(o => OUTCOME_ICON[o] ?? '?').join('')} — ${notes.join(', ')}`;
+}
+
 function location(file, line) {
   return line ? `pwtest://${file}:${line}` : `pwtest://${file}`;
 }
@@ -62,6 +100,7 @@ class PlaywrightToolkitReporter {
 
   onBegin(config, suite) {
     this.rootDir = config.rootDir;
+    this.history = loadHistory(config.configFile ? path.dirname(config.configFile) : process.cwd());
     message('enteredTheMatrix', {});
     message('testingStarted', {});
     message('testCount', { count: suite.allTests().length });
@@ -123,11 +162,17 @@ class PlaywrightToolkitReporter {
     const attachments = result.attachments.filter(a => a.path).map(a => ({ name: a.name, path: a.path, contentType: a.contentType }));
     this.results[test.id] = {
       file: test.location.file, line: test.location.line, title: test.titlePath().slice(1).join(' › '),
+      project: test.parent?.project()?.name,
       status: result.status, retry: result.retry, attachments,
     };
     for (const a of attachments) message('testStdOut', { nodeId: test.id, out: `${a.name}: ${a.path}\n` });
 
     const willRetry = result.status !== 'passed' && result.status !== 'skipped' && result.retry < test.retries;
+    if (!willRetry) {
+      this.saveResults();
+      const history = describeHistory(this.history, test.id, test.outcome() === 'unexpected');
+      if (history) message('testStdOut', { nodeId: test.id, out: history + '\n' });
+    }
     if (willRetry) {
       for (const error of result.errors) message('testStdErr', { nodeId: test.id, out: describeError(error).details + '\n' });
       return;
@@ -158,14 +203,18 @@ class PlaywrightToolkitReporter {
   onEnd() {
     for (const id of [...this.started].reverse()) message('testSuiteFinished', { nodeId: id });
     message('testingFinished', {});
+    this.saveResults();
+  }
+
+  /** Written after every test, so the IDE actions work even if the run is stopped. */
+  saveResults() {
     const file = process.env.PWTK_RESULTS_FILE;
-    if (file) {
-      try {
-        fs.mkdirSync(path.dirname(file), { recursive: true });
-        fs.writeFileSync(file, JSON.stringify({ rootDir: this.rootDir, tests: this.results }, null, 1));
-      } catch (e) {
-        process.stderr.write(`[playwright-toolkit] cannot write ${file}: ${e}\n`);
-      }
+    if (!file) return;
+    try {
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, JSON.stringify({ rootDir: this.rootDir, tests: this.results }, null, 1));
+    } catch (e) {
+      process.stderr.write(`[playwright-toolkit] cannot write ${file}: ${e}\n`);
     }
   }
 }

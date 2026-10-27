@@ -65,6 +65,7 @@ public class PwTestTreeTest extends BasePlatformTestCase {
                 .createTemplateConfiguration(getProject());
         config.setWorkingDirectory(sample.getPath());
         config.setTestPath(testFile.getPath());
+        config.setTraceMode("retain-on-failure");
 
         Executor executor = DefaultRunExecutor.getRunExecutorInstance();
         ExecutionEnvironment environment = ExecutionEnvironmentBuilder.create(getProject(), executor, config).build();
@@ -124,11 +125,53 @@ public class PwTestTreeTest extends BasePlatformTestCase {
         assertEquals(java.util.Set.of(testFile.getPath() + ":9"), PwRerunFailedTestsAction.failedTargets(List.of(passes, fails, skipped)));
         var restart = ((com.intellij.execution.DefaultExecutionResult) result).getRestartActions();
         assertTrue("Rerun Failed Tests button", restart.length > 0 && restart[0] instanceof PwRerunFailedTestsAction);
+
+        // results for the tree actions: trace and screenshot of the failed test
+        PwRunResults results = PwRunResults.load(sample);
+        assertNotNull(results);
+        PwRunResults.Test failed = results.at(testFile.getPath(), 9).get(0);
+        assertEquals("failed", failed.status());
+        assertTrue(failed.attachments().toString(), failed.attachments().stream().anyMatch(a -> a.isTrace() && new File(a.path()).isFile()));
+        assertTrue(failed.attachments().toString(), failed.attachments().stream().anyMatch(a -> a.isImage() && new File(a.path()).isFile()));
+        assertTrue(results.at(testFile.getPath(), 4).get(0).attachments().isEmpty());
+
+        // history of playwright-extended-report is shown in the test output
+        File history = new File(sample, "extended-report-history.json");
+        Files.writeString(history.toPath(), "{\"version\":1,\"runs\":[" +
+                "{\"runId\":\"1\",\"tests\":{\"" + failed.id() + "\":[\"p\",100]}}," +
+                "{\"runId\":\"2\",\"tests\":{\"" + failed.id() + "\":[\"p\",120]}}]}");
+        try {
+            ExecutionResult second = config.getState(executor, environment).execute(executor, ProgramRunner.getRunner(executor.getId(), config));
+            Disposer.register(getTestRootDisposable(), second.getExecutionConsole());
+            StringBuilder output = new StringBuilder();
+            second.getProcessHandler().addProcessListener(new com.intellij.execution.process.ProcessListener() {
+                @Override
+                public void onTextAvailable(@org.jetbrains.annotations.NotNull com.intellij.execution.process.ProcessEvent event,
+                                            @org.jetbrains.annotations.NotNull com.intellij.openapi.util.Key outputType) {
+                    output.append(event.getText());
+                }
+            });
+            second.getProcessHandler().startNotify();
+            assertTrue(second.getProcessHandler().waitFor(120_000));
+            assertTrue(output.toString(), output.toString().contains("History (previous 2 runs, extended report): ✓✓ — failed 0 of 2, NEW failure"));
+        } finally {
+            FileUtil.delete(history);
+        }
     }
 
     private static SMTestProxy find(List<? extends SMTestProxy> tests, String name) {
         SMTestProxy test = tests.stream().filter(t -> name.equals(t.getName())).findFirst().orElse(null);
         assertNotNull("no node " + name + " in " + tests, test);
         return test;
+    }
+
+    public void testEnvironmentCheck() {
+        List<String> lines = PwToolsActions.check(new File(System.getProperty("pwtoolkit.sample")));
+        String report = String.join("\n", lines);
+        assertTrue(report, lines.stream().anyMatch(l -> l.startsWith("✓ Node.js")));
+        assertTrue(report, lines.stream().anyMatch(l -> l.startsWith("✓ Playwright: Version 1.")));
+        assertTrue(report, lines.stream().anyMatch(l -> l.startsWith("✓ Chrome for Testing")));
+        assertTrue(report, lines.stream().anyMatch(l -> l.startsWith("✓ TypeScript 7")));
+        assertTrue(report, lines.stream().anyMatch(l -> l.startsWith("✓ vscode-js-debug")));
     }
 }

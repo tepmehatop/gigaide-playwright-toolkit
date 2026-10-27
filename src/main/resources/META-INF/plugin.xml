@@ -36,10 +36,31 @@
     </extensions>
 
     <actions>
-        <action id="dev.pwtoolkit.DiagnoseHighlighting" class="dev.pwtoolkit.nav.HighlightingDiagnosticsAction"
-                text="Playwright Toolkit: Diagnose Highlighting"
-                description="Copy all highlighters of the caret line (layers, keys, colors) for troubleshooting">
+        <group id="dev.pwtoolkit.TestTreeActions">
+            <separator/>
+            <action id="dev.pwtoolkit.OpenTrace" class="dev.pwtoolkit.tests.PwTestTreeActions$OpenTrace"
+                    text="Open Trace" description="Open the trace of this test in Playwright Trace Viewer"/>
+            <action id="dev.pwtoolkit.OpenAttachment" class="dev.pwtoolkit.tests.PwTestTreeActions$OpenAttachment"
+                    text="Open Screenshot / Attachment..." description="Screenshots, video, error context of this test"/>
+            <action id="dev.pwtoolkit.OpenInReport" class="dev.pwtoolkit.tests.PwTestTreeActions$OpenInReport"
+                    text="Open in Report" description="Open this test in playwright-extended-report (or the HTML report)"/>
+            <add-to-group group-id="TestTreePopupMenu" anchor="last"/>
+        </group>
+        <group id="dev.pwtoolkit.ToolsMenu" text="Playwright" popup="true">
+            <action id="dev.pwtoolkit.ShowReport" class="dev.pwtoolkit.tests.PwToolsActions$ShowReport"
+                    text="Show Report" description="Open playwright-extended-report or the Playwright HTML report"/>
+            <action id="dev.pwtoolkit.Codegen" class="dev.pwtoolkit.tests.PwToolsActions$Codegen"
+                    text="Record New Test (Codegen)..." description="Record browser actions as Playwright code"/>
+            <action id="dev.pwtoolkit.InstallBrowsers" class="dev.pwtoolkit.tests.PwToolsActions$InstallBrowsers"
+                    text="Install Browsers" description="playwright install for the project's Playwright version"/>
+            <action id="dev.pwtoolkit.CheckEnvironment" class="dev.pwtoolkit.tests.PwToolsActions$CheckEnvironment"
+                    text="Check Environment" description="Node.js, Playwright, browsers, TypeScript 7, js-debug"/>
             <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </group>
+        <action id="dev.pwtoolkit.DiagnoseHighlighting" class="dev.pwtoolkit.nav.HighlightingDiagnosticsAction"
+                text="Diagnose Highlighting"
+                description="Copy all highlighters of the caret line (layers, keys, colors) for troubleshooting">
+            <add-to-group group-id="dev.pwtoolkit.ToolsMenu" anchor="last"/>
         </action>
     </actions>
 

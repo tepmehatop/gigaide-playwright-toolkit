@@ -83,7 +83,7 @@ public record PwLaunchSpec(@NotNull String node,
         }
         // the IDE test tree: added next to the reporters of playwright.config (html, extended report...), not instead of them
         env.put("PW_TEST_REPORTER", PwResources.install(PwResources.REPORTER).toString());
-        env.put(RESULTS_FILE_ENV, PwResources.dir().resolve("results").resolve(java.util.UUID.randomUUID() + ".json").toString());
+        env.put(RESULTS_FILE_ENV, dev.pwtoolkit.tests.PwRunResults.fileFor(workDir).toString());
         env.putAll(config.getEnvData().getEnvs());
         return new PwLaunchSpec(node, cli, args, workDir, env, config.getEnvData().isPassParentEnvs());
     }
