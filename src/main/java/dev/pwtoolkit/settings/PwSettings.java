@@ -26,6 +26,8 @@ public final class PwSettings implements PersistentStateComponent<PwSettings.Sta
         public boolean showBrowserWhenDebugging = true;
         public boolean pauseOnFailure = true;
         public boolean disableGigaJestMarker = true;
+        /** Hide GigaIDE's tsx/node:test run icon in Playwright test files. */
+        public boolean hideGigaTsxMarker = true;
         public boolean rainbowBrackets = true;
         /** Keep one browser open between runs (like "Show browser" in VS Code). */
         public boolean reuseBrowser = false;

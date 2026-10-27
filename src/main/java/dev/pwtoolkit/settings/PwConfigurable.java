@@ -34,6 +34,7 @@ public final class PwConfigurable implements SearchableConfigurable {
     private JBCheckBox pauseOnFailure;
     private JBCheckBox reuseBrowser;
     private JBCheckBox disableJestMarker;
+    private JBCheckBox hideTsxMarker;
 
     @Override
     public @NotNull String getId() {
@@ -63,6 +64,7 @@ public final class PwConfigurable implements SearchableConfigurable {
         reuseBrowser = new JBCheckBox("Show browser and keep it open between runs (Run and Debug)");
         pauseOnFailure = new JBCheckBox("Pause on the failing line of a test while debugging (like VS Code)");
         disableJestMarker = new JBCheckBox("Work around GigaIDE's broken Jest gutter marker in test files (restart required)");
+        hideTsxMarker = new JBCheckBox("Hide GigaIDE's tsx Run icon in Playwright test files (restart required)");
         disableJestMarker.setToolTipText("GigaIDE NodeJS plugin fails on every *.test.ts and the file analysis never finishes");
 
         String node = NodeLocator.findNode(null);
@@ -90,6 +92,7 @@ public final class PwConfigurable implements SearchableConfigurable {
                 .addComponent(pauseOnFailure)
                 .addSeparator()
                 .addComponent(disableJestMarker)
+                .addComponent(hideTsxMarker)
                 .addComponentFillVertically(new javax.swing.JPanel(), 0)
                 .getPanel();
     }
@@ -114,7 +117,8 @@ public final class PwConfigurable implements SearchableConfigurable {
                 || showBrowser.isSelected() != s.showBrowserWhenDebugging
                 || pauseOnFailure.isSelected() != s.pauseOnFailure
                 || reuseBrowser.isSelected() != s.reuseBrowser
-                || disableJestMarker.isSelected() != s.disableGigaJestMarker;
+                || disableJestMarker.isSelected() != s.disableGigaJestMarker
+                || hideTsxMarker.isSelected() != s.hideGigaTsxMarker;
     }
 
     @Override
@@ -137,6 +141,7 @@ public final class PwConfigurable implements SearchableConfigurable {
         s.reuseBrowser = reuseBrowser.isSelected();
         if (disableJestMarker.isSelected() && !s.disableGigaJestMarker) dev.pwtoolkit.compat.GigaJestMarkerWorkaround.apply();
         s.disableGigaJestMarker = disableJestMarker.isSelected();
+        s.hideGigaTsxMarker = hideTsxMarker.isSelected();
         if (serverChanged) {
             for (var project : ProjectManager.getInstance().getOpenProjects()) TsLanguageService.getInstance(project).restartAll();
         }
@@ -160,5 +165,6 @@ public final class PwConfigurable implements SearchableConfigurable {
         pauseOnFailure.setSelected(s.pauseOnFailure);
         reuseBrowser.setSelected(s.reuseBrowser);
         disableJestMarker.setSelected(s.disableGigaJestMarker);
+        hideTsxMarker.setSelected(s.hideGigaTsxMarker);
     }
 }
