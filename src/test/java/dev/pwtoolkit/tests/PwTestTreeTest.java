@@ -96,6 +96,27 @@ public class PwTestTreeTest extends BasePlatformTestCase {
         Document document = FileDocumentManager.getInstance().getDocument(locations.get(0).getVirtualFile());
         assertEquals(8, document.getLineNumber(locations.get(0).getPsiElement().getTextOffset()));
 
+        // the failed test's output in the console has clickable links to the stack lines
+        SMTRunnerConsoleView view = (SMTRunnerConsoleView) result.getExecutionConsole();
+        view.getComponent();
+        view.getResultsViewer().selectAndNotify(fails);
+        var printer = (com.intellij.execution.impl.ConsoleViewImpl) view.getConsole();
+        String consoleText = "";
+        boolean linked = false;
+        for (int i = 0; i < 100 && !linked; i++) {
+            PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue();
+            printer.flushDeferredText();
+            var editor = printer.getEditor();
+            consoleText = editor.getDocument().getText();
+            String text = consoleText;
+            linked = com.intellij.execution.impl.EditorHyperlinkSupport.get(editor).getAllHyperlinks(0, text.length()).stream()
+                    .anyMatch(h -> text.substring(h.getStartOffset(), h.getEndOffset()).contains("tree.test.ts:11"));
+            if (!linked) Thread.sleep(100);
+        }
+        assertTrue("no link to tree.test.ts:11 in:\n" + consoleText, linked);
+        assertEquals("the error message is printed once", consoleText.indexOf("toHaveText(expected) failed"),
+                consoleText.lastIndexOf("toHaveText(expected) failed"));
+
         // gutter icons read the last state by the same URL
         assertNotNull("state for the gutter icon", TestStateStorage.getInstance(getProject()).getState(fails.getLocationUrl()));
 

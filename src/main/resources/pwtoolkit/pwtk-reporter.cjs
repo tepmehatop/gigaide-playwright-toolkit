@@ -40,7 +40,10 @@ function describeError(error) {
   const expected = /^\s*Expected(?: [a-z ]+)?:\s?(.*)$/mi.exec(text);
   const received = /^\s*Received(?: [a-z ]+)?:\s?(.*)$/mi.exec(text);
   const stack = String(error?.stack ?? '').replace(ANSI, '');
-  const details = stack.includes(first) ? stack : [text, stack].filter(Boolean).join('\n');
+  let details = stack.includes(first) ? stack : [text, stack].filter(Boolean).join('\n');
+  // the IDE prints the message above the details: do not repeat it
+  const lines = details.split('\n');
+  if (lines[0]?.trim() === first.trim()) details = lines.slice(1).join('\n');
   return { message: first.trim(), details, expected: expected?.[1], actual: received?.[1] };
 }
 

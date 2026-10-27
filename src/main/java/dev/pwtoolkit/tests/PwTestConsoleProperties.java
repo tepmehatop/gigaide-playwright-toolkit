@@ -14,12 +14,22 @@ import java.io.File;
 public final class PwTestConsoleProperties extends SMTRunnerConsoleProperties {
     public static final String FRAMEWORK = "Playwright";
 
+    private final PwRunConfiguration config;
+
     public PwTestConsoleProperties(@NotNull PwRunConfiguration config, @NotNull Executor executor) {
         super(config, FRAMEWORK, executor);
         setIdBasedTestTree(true);
         setPrintTestingStartedTime(false);
+        this.config = config;
+    }
+
+    /**
+     * Clickable stacks, code frames and attachment paths. Must be added to the console itself
+     * ({@code addMessageFilter}): the test tree does not apply {@code addStackTraceFilter} to this output.
+     */
+    public @NotNull PwStackTraceFilter createLinkFilter() {
         String workDir = config.getWorkingDirectory();
-        addStackTraceFilter(new PwStackTraceFilter(config.getProject(), new File(workDir == null ? "" : workDir)));
+        return new PwStackTraceFilter(config.getProject(), new File(workDir == null ? "" : workDir));
     }
 
     @Override

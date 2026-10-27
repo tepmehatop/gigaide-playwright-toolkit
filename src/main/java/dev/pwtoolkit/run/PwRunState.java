@@ -33,6 +33,7 @@ final class PwRunState extends CommandLineState {
         PwTestConsoleProperties properties = new PwTestConsoleProperties(config, executor);
         BaseTestsOutputConsoleView console = SMTestRunnerConnectionUtil.createAndAttachConsole(
                 PwTestConsoleProperties.FRAMEWORK, handler, properties);
+        console.addMessageFilter(properties.createLinkFilter());
         DefaultExecutionResult result = new DefaultExecutionResult(console, handler, createActions(console, handler, executor));
         AbstractRerunFailedTestsAction rerunFailed = properties.createRerunFailedTestsAction(console);
         if (rerunFailed != null && console instanceof SMTRunnerConsoleView smConsole) {

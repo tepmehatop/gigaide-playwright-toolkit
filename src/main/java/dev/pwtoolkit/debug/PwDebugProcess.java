@@ -113,8 +113,10 @@ public final class PwDebugProcess extends XDebugProcess {
     public @NotNull com.intellij.execution.ui.ExecutionConsole createConsole() {
         if (testProperties != null) {
             try {
-                return com.intellij.execution.testframework.sm.SMTestRunnerConnectionUtil.createAndAttachConsole(
+                var console = com.intellij.execution.testframework.sm.SMTestRunnerConnectionUtil.createAndAttachConsole(
                         PwTestConsoleProperties.FRAMEWORK, processHandler, testProperties);
+                console.addMessageFilter(testProperties.createLinkFilter());
+                return console;
             } catch (com.intellij.execution.ExecutionException e) {
                 LOG.warn("Cannot create the test tree console", e);
             }
