@@ -31,8 +31,17 @@
 
         <applicationConfigurable parentId="tools" instance="dev.pwtoolkit.settings.PwConfigurable"
                                  id="dev.pwtoolkit.settings" displayName="Playwright Toolkit"/>
+        <additionalTextAttributes scheme="Darcula" file="colorSchemes/PwToolkitDarcula.xml"/>
         <notificationGroup id="Playwright Toolkit" displayType="BALLOON"/>
     </extensions>
+
+    <actions>
+        <action id="dev.pwtoolkit.DiagnoseHighlighting" class="dev.pwtoolkit.nav.HighlightingDiagnosticsAction"
+                text="Playwright Toolkit: Diagnose Highlighting"
+                description="Copy all highlighters of the caret line (layers, keys, colors) for troubleshooting">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+    </actions>
 
     <applicationListeners>
         <listener class="dev.pwtoolkit.compat.GigaJestMarkerWorkaround" topic="com.intellij.ide.AppLifecycleListener"/>

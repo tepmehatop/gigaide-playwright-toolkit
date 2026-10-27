@@ -42,6 +42,8 @@ public class TsSemanticHighlightingTest extends BasePlatformTestCase {
 
         RangeHighlighter selectors = at(highlighters, text.indexOf("selectors.greeting"));
         assertNotNull("`selectors` is not highlighted", selectors);
+        // above the IDE's own info highlights: GigaIDE puts plain-colored highlights on the same words at layer 3000
+        assertTrue(selectors.getLayer() > com.intellij.openapi.editor.markup.HighlighterLayer.ADDITIONAL_SYNTAX);
         assertTrue(selectors.getTextAttributesKey().getExternalName(), selectors.getTextAttributesKey().getExternalName().contains("INSTANCE_FIELD"));
         TextAttributes attributes = EditorColorsManager.getInstance().getGlobalScheme().getAttributes(selectors.getTextAttributesKey());
         assertNotNull("no color for fields", attributes.getForegroundColor());

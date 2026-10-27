@@ -44,6 +44,8 @@ public final class TsSemanticHighlighter implements Disposable {
     private static final Logger LOG = Logger.getInstance(TsSemanticHighlighter.class);
     private static final Key<List<RangeHighlighter>> HIGHLIGHTERS = Key.create("pwtoolkit.semantic.highlighters");
     private static final int DELAY_MS = 300;
+    /** Just above the IDE's own info highlights (3000), which GigaIDE puts on the same words with plain colors; below warnings and errors. */
+    static final int LAYER = HighlighterLayer.ADDITIONAL_SYNTAX + 1;
 
     private final Project project;
     private final Alarm alarm;
@@ -165,12 +167,12 @@ public final class TsSemanticHighlighter implements Disposable {
                     ? rainbowKeys[Math.floorMod(text.subSequence(token.start(), end).toString().hashCode(), rainbowKeys.length)]
                     : TsSemanticColors.keyFor(token, typeScript);
             if (key == null) continue;
-            added.add(model.addRangeHighlighter(key, token.start(), end, HighlighterLayer.ADDITIONAL_SYNTAX, HighlighterTargetArea.EXACT_RANGE));
+            added.add(model.addRangeHighlighter(key, token.start(), end, LAYER, HighlighterTargetArea.EXACT_RANGE));
         }
         for (Bracket bracket : brackets) {
             if (bracket.offset() >= length) continue;
             TextAttributesKey key = rainbowKeys[bracket.depth() % rainbowKeys.length];
-            added.add(model.addRangeHighlighter(key, bracket.offset(), bracket.offset() + 1, HighlighterLayer.ADDITIONAL_SYNTAX, HighlighterTargetArea.EXACT_RANGE));
+            added.add(model.addRangeHighlighter(key, bracket.offset(), bracket.offset() + 1, LAYER, HighlighterTargetArea.EXACT_RANGE));
         }
         document.putUserData(HIGHLIGHTERS, added);
         LOG.debug("[pwtoolkit] semantic highlighting: " + added.size() + " ranges in " + FileDocumentManager.getInstance().getFile(document));

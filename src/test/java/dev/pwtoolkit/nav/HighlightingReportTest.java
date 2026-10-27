@@ -53,6 +53,11 @@ public class HighlightingReportTest extends BasePlatformTestCase {
                     com.intellij.lang.Language.findLanguageByID("TypeScript"), Boolean.TRUE);
             manager.setGlobalScheme(islands);
             report(path, islands);
+            // Darcula with "Semantic highlighting" enabled in Language Defaults (what the user did)
+            EditorColorsScheme darcula = (EditorColorsScheme) manager.getScheme("Darcula").clone();
+            com.intellij.codeHighlighting.RainbowHighlighter.setRainbowEnabled((com.intellij.openapi.options.SchemeMetaInfo) darcula, null, Boolean.TRUE);
+            manager.setGlobalScheme(darcula);
+            report(path, darcula);
         } finally {
             manager.setGlobalScheme(original);
         }
@@ -65,6 +70,15 @@ public class HighlightingReportTest extends BasePlatformTestCase {
         TsSemanticHighlighter.getInstance(getProject()).highlight(file);
         PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue();
         Document document = myFixture.getEditor().getDocument();
+        // GigaIDE's own analysis on top (it completes now that the Jest marker is disabled)
+        for (var info : myFixture.doHighlighting()) {
+            int l = document.getLineNumber(info.getStartOffset()) + 1;
+            if (l == 8 || l == 9) {
+                System.out.println("REPORT GIGA " + l + " " + document.getText().substring(info.getStartOffset(), info.getEndOffset())
+                        + " severity=" + info.getSeverity() + " key=" + info.forcedTextAttributesKey + " attrs=" + info.forcedTextAttributes
+                        + " layer=" + info.getHighlighter());
+            }
+        }
         List<RangeHighlighter> highlighters = TsSemanticHighlighter.appliedHighlighters(document);
         System.out.println("REPORT ===== " + scheme.getName() + " : " + (highlighters == null ? 0 : highlighters.size()) + " ranges");
         if (highlighters == null) return;
