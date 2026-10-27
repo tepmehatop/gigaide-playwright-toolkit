@@ -49,6 +49,11 @@
             <add-to-group group-id="TestTreePopupMenu" anchor="last"/>
         </group>
         <group id="dev.pwtoolkit.ToolsMenu" text="Playwright" popup="true">
+            <action id="dev.pwtoolkit.ReuseBrowser" class="dev.pwtoolkit.run.PwBrowserActions$ToggleReuse"
+                    text="Show Browser (Keep Open Between Runs)" description="Run and debug tests in one visible browser that stays open"/>
+            <action id="dev.pwtoolkit.CloseBrowser" class="dev.pwtoolkit.run.PwBrowserActions$Close"
+                    text="Close Browser" description="Close the browser kept open between runs"/>
+            <separator/>
             <action id="dev.pwtoolkit.ShowReport" class="dev.pwtoolkit.tests.PwToolsActions$ShowReport"
                     text="Show Report" description="Open playwright-extended-report or the Playwright HTML report"/>
             <action id="dev.pwtoolkit.Codegen" class="dev.pwtoolkit.tests.PwToolsActions$Codegen"

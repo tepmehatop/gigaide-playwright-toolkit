@@ -101,7 +101,7 @@ public final class PwRunConfiguration extends LocatableConfigurationBase<PwRunCo
             throw new RuntimeConfigurationError("Working directory (folder with playwright.config) is not set");
         }
         try {
-            PwLaunchSpec.create(this, false);
+            PwLaunchSpec.create(this, false, false);
         } catch (ExecutionException e) {
             throw new RuntimeConfigurationError(e.getMessage());
         }

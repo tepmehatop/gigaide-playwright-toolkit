@@ -30,6 +30,11 @@ public record PwLaunchSpec(@NotNull String node,
     public static final String RESULTS_FILE_ENV = "PWTK_RESULTS_FILE";
 
     public static @NotNull PwLaunchSpec create(@NotNull PwRunConfiguration config, boolean debug) throws ExecutionException {
+        return create(config, debug, true);
+    }
+
+    /** {@code startBrowser = false}: validation only, never starts the shared browser server. */
+    static @NotNull PwLaunchSpec create(@NotNull PwRunConfiguration config, boolean debug, boolean startBrowser) throws ExecutionException {
         File workDir = new File(StringUtil.notNullize(config.getWorkingDirectory()));
         if (!workDir.isDirectory()) throw new ExecutionException("Working directory does not exist: " + workDir);
 
@@ -66,7 +71,8 @@ public record PwLaunchSpec(@NotNull String node,
         if (config.isLastFailed() && config.getRerunTargets().isEmpty()) args.add("--last-failed");
         if (!StringUtil.isEmptyOrSpaces(config.getTraceMode())) args.add("--trace=" + config.getTraceMode().trim());
         PwSettings.StateBean settings = PwSettings.getInstance().getState();
-        if (config.isHeaded() || (debug && settings.showBrowserWhenDebugging)) args.add("--headed");
+        boolean reuseBrowser = settings.reuseBrowser;
+        if (config.isHeaded() || reuseBrowser || (debug && settings.showBrowserWhenDebugging)) args.add("--headed");
         List<String> extra = ParametersListUtil.parse(StringUtil.notNullize(config.getExtraArgs()));
         args.addAll(extra);
         Map<String, String> env = new LinkedHashMap<>();
@@ -84,6 +90,11 @@ public record PwLaunchSpec(@NotNull String node,
         // the IDE test tree: added next to the reporters of playwright.config (html, extended report...), not instead of them
         env.put("PW_TEST_REPORTER", PwResources.install(PwResources.REPORTER).toString());
         env.put(RESULTS_FILE_ENV, dev.pwtoolkit.tests.PwRunResults.fileFor(workDir).toString());
+        if (reuseBrowser && startBrowser) {
+            // the browser stays open between runs: the tests connect to the IDE's run-server (see PwBrowserServer)
+            env.put("PW_TEST_CONNECT_WS_ENDPOINT", PwBrowserServer.getInstance(config.getProject()).ensureStarted(workDir, node, cli));
+            env.put("PW_TEST_REUSE_CONTEXT", "1");
+        }
         env.putAll(config.getEnvData().getEnvs());
         return new PwLaunchSpec(node, cli, args, workDir, env, config.getEnvData().isPassParentEnvs());
     }

@@ -16,7 +16,7 @@
 | Консоль отладчика, отчёт о недостигнутых брейкпоинтах | — |
 | Обход бага GigaIDE (Jest-маркер ломает анализ `*.test.ts`) | снятие одного extension при старте |
 
-## Этап 1 — результаты прогона внутри IDE
+## Этап 1 — результаты прогона внутри IDE ✅ (1.2.0)
 
 **1.1. Дерево тестов и статус в gutter**
 
@@ -51,7 +51,7 @@
 
 ## Этап 2 — браузер и Explore locators (приоритет)
 
-**2.1. Переиспользуемый браузер (Show browser)**
+**2.1. Переиспользуемый браузер (Show browser)** ✅ (1.2.0)
 - Как `reusedBrowser.ts` в playwright-vscode: IDE держит фоновый `playwright run-server` и передаёт тестам `PW_TEST_CONNECT_WS_ENDPOINT` + `PW_TEST_REUSE_CONTEXT=1`. Окно браузера не закрывается между прогонами, видно, где остановился тест.
 - Кнопка «Close browser» в тулбаре. Основа для 2.2.
 
@@ -64,6 +64,7 @@
 
 - Watch mode (перезапуск по сохранению) — частично заменяется «Open UI Mode» (`playwright test --ui`).
 - Pick locator со вставкой в код — опирается на внутренний API Playwright; фолбэк — Codegen.
+- Расширения Chrome при Debug (SelectorsHub, LocatorLabs, CSS Selector Helper): `launchPersistentContext` + `--load-extension` в браузере Playwright (проверено: загружаются в Chrome for Testing 156); требует однократной правки `baseTest.ts`.
 
 Не делаем: встроенный Trace Viewer (есть `show-trace` и отчёт), Intelligence/Scenario Lab, мутационное тестирование, Product Promises, Change Radar из playwright-studio.
 

@@ -27,6 +27,8 @@ public final class PwSettings implements PersistentStateComponent<PwSettings.Sta
         public boolean pauseOnFailure = true;
         public boolean disableGigaJestMarker = true;
         public boolean rainbowBrackets = true;
+        /** Keep one browser open between runs (like "Show browser" in VS Code). */
+        public boolean reuseBrowser = false;
     }
 
     private StateBean state = new StateBean();
