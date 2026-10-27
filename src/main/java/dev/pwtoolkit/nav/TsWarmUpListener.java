@@ -20,5 +20,7 @@ public final class TsWarmUpListener implements FileEditorManagerListener {
             });
         }
         if (settings.semanticHighlighting) TsSemanticHighlighter.getInstance(source.getProject()).scheduleOpenFiles();
+        // starts following the caret for "Explore locators"
+        dev.pwtoolkit.run.PwLocatorExplorer.getInstance(source.getProject());
     }
 }

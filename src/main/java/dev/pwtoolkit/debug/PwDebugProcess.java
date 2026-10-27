@@ -346,6 +346,34 @@ public final class PwDebugProcess extends XDebugProcess {
         return array;
     }
 
+    /**
+     * Explore locators while paused: evaluates a locator expression (side-effect free, see PwLocatorExpressions) in the
+     * selected frame and returns locator code for the highlight ({@code locator('h1')}), or null.
+     */
+    public @Nullable String evaluateLocator(@NotNull String expression) {
+        if (!(getSession().getSuspendContext() instanceof PwSuspendContext context)) return null;
+        PwExecutionStack stack = context.getActiveExecutionStack();
+        com.intellij.xdebugger.frame.XStackFrame current = getSession().getCurrentStackFrame();
+        int frameId = current instanceof PwStackFrame frame ? frame.frameId()
+                : stack.getTopFrame() instanceof PwStackFrame top ? top.frameId() : -1;
+        if (frameId < 0) return null;
+        String js = "(() => { try { const v = (" + expression + "); "
+                + "if (typeof v === 'string') return \"locator('\" + v.replace(/\\\\/g, '\\\\\\\\').replace(/'/g, \"\\\\'\") + \"')\"; "
+                + "if (v && typeof v._selector === 'string') return String(v); return ''; } catch (e) { return ''; } })()";
+        try {
+            JsonObject result = stack.session.connection.request("evaluate",
+                    Map.of("expression", js, "frameId", frameId, "context", "clipboard")).get(5, TimeUnit.SECONDS);
+            String value = result.has("result") ? result.get("result").getAsString().strip() : "";
+            // js-debug wraps strings that contain ' in double quotes, even in the "clipboard" context
+            if (value.length() >= 2 && value.startsWith("\"") && value.endsWith("\"")) {
+                value = new com.google.gson.Gson().fromJson(value, String.class);
+            }
+            return value.isBlank() || value.equals("''") ? null : value;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     static @NotNull String errorMessage(@NotNull Throwable error) {
         Throwable cause = error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
         return String.valueOf(cause.getMessage());

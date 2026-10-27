@@ -21,10 +21,15 @@ public class TsSemanticColorsTest extends BasePlatformTestCase {
 
     /** In Islands Dark GigaIDE's TS_ keys have no color: fall back to a key that is actually colored. */
     public void testSkipsColorlessGigaKeys() {
+        // whatever registered it before (GigaIDE or another test), make TS_STATIC_FIELD colorless in the current scheme
         TextAttributesKey colorless = TextAttributesKey.createTextAttributesKey("TS_STATIC_FIELD");
+        var scheme = com.intellij.openapi.editor.colors.EditorColorsManager.getInstance().getGlobalScheme();
+        scheme.setAttributes(colorless, new com.intellij.openapi.editor.markup.TextAttributes());
+
         TextAttributesKey ours = TsSemanticColors.keyFor(new TsLanguageService.SemanticToken(0, 1, "property", Set.of("static")), true);
         assertNotSame(colorless, ours);
-        assertEquals(DefaultLanguageHighlighterColors.STATIC_FIELD, ours);
+        var attributes = scheme.getAttributes(ours);
+        assertTrue(ours.getExternalName(), attributes != null && (attributes.getForegroundColor() != null || attributes.getFontType() != 0));
     }
 
     public void testStripsAnsiFromDebuggerValues() {

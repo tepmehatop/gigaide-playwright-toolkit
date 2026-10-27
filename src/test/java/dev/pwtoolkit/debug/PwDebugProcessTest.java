@@ -43,6 +43,7 @@ public class PwDebugProcessTest extends BasePlatformTestCase {
     private final Set<Object> verified = ConcurrentHashMap.newKeySet();
     private final StringBuffer output = new StringBuffer();
     private PwDebugProcess process;
+    private volatile XSuspendContext lastContext;
 
     @Override
     protected void tearDown() throws Exception {
@@ -91,6 +92,10 @@ public class PwDebugProcessTest extends BasePlatformTestCase {
         assertTrue(names.toString(), names.contains("login") && names.contains("password"));
         assertEquals("'admin:Qwerty123'", evaluate(frame, "login + ':' + password"));
         assertTrue("breakpoints must be verified", verified.contains(inPageObject));
+        // Explore locators while paused: Page Object fields evaluated in the frame
+        assertEquals("locator('#login')", process.evaluateLocator("this.page.locator(this.selectors.loginInput)"));
+        assertEquals("locator('#password')", process.evaluateLocator("this.selectors.passwordInput"));
+        assertNull("not a locator", process.evaluateLocator("this.page"));
 
         // 2. resume -> stops in the test body
         process.resume(first.context);
@@ -250,13 +255,16 @@ public class PwDebugProcessTest extends BasePlatformTestCase {
                     case "breakpointReached" -> {
                         XSuspendContext context = null;
                         for (Object arg : args) if (arg instanceof XSuspendContext c) context = c;
+                        lastContext = context;
                         stops.add(new Stop("breakpoint", context, (XLineBreakpoint<?>) args[0]));
                         yield true;
                     }
                     case "positionReached" -> {
+                        lastContext = (XSuspendContext) args[0];
                         stops.add(new Stop("position", (XSuspendContext) args[0], null));
                         yield null;
                     }
+                    case "getSuspendContext" -> lastContext;
                     case "setBreakpointVerified" -> {
                         verified.add(args[0]);
                         yield null;

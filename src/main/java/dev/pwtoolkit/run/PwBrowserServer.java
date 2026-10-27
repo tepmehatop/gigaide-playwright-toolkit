@@ -30,6 +30,7 @@ import java.util.regex.Pattern;
 public final class PwBrowserServer implements Disposable {
     private static final Pattern LISTENING = Pattern.compile("Listening on (ws://\\S+)");
     private final Map<String, Server> servers = new ConcurrentHashMap<>();
+    private final Map<String, PwDebugController> controllers = new ConcurrentHashMap<>();
 
     private record Server(@NotNull KillableProcessHandler process, @NotNull String wsEndpoint) {
     }
@@ -93,8 +94,31 @@ public final class PwBrowserServer implements Disposable {
         return servers.values().stream().anyMatch(s -> !s.process().isProcessTerminated());
     }
 
+    /**
+     * The debug controller of a running server (connected on first use), for highlighting locators in its browser.
+     * Null when no browser is kept open.
+     */
+    public synchronized @Nullable PwDebugController controller() {
+        for (Map.Entry<String, Server> entry : servers.entrySet()) {
+            if (entry.getValue().process().isProcessTerminated()) continue;
+            PwDebugController controller = controllers.get(entry.getKey());
+            if (controller == null || controller.isClosed()) {
+                try {
+                    controller = PwDebugController.connect(entry.getValue().wsEndpoint());
+                    controllers.put(entry.getKey(), controller);
+                } catch (Exception e) {
+                    continue;
+                }
+            }
+            return controller;
+        }
+        return null;
+    }
+
     /** Closes the kept browsers (the next run starts a new one). */
     public synchronized void stopAll() {
+        controllers.values().forEach(PwDebugController::close);
+        controllers.clear();
         servers.values().forEach(s -> s.process().destroyProcess());
         servers.clear();
     }

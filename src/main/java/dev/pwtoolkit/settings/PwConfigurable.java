@@ -33,6 +33,7 @@ public final class PwConfigurable implements SearchableConfigurable {
     private JBCheckBox showBrowser;
     private JBCheckBox pauseOnFailure;
     private JBCheckBox reuseBrowser;
+    private JBCheckBox exploreLocators;
     private JBCheckBox disableJestMarker;
     private JBCheckBox hideTsxMarker;
 
@@ -61,6 +62,7 @@ public final class PwConfigurable implements SearchableConfigurable {
         rainbowBrackets = new JBCheckBox("Rainbow brackets in TS/JS files (color by nesting depth)");
         semanticHighlighting.setToolTipText("Unique colors for parameters and local variables: Settings | Editor | Color Scheme | Language Defaults | Semantic highlighting");
         showBrowser = new JBCheckBox("Show the browser while debugging (--headed)");
+        exploreLocators = new JBCheckBox("Explore locators: highlight the locator under the caret in that browser");
         reuseBrowser = new JBCheckBox("Show browser and keep it open between runs (Run and Debug)");
         pauseOnFailure = new JBCheckBox("Pause on the failing line of a test while debugging (like VS Code)");
         disableJestMarker = new JBCheckBox("Work around GigaIDE's broken Jest gutter marker in test files (restart required)");
@@ -88,6 +90,7 @@ public final class PwConfigurable implements SearchableConfigurable {
                 .addComponentToRightColumn(hint("Detected: " + (jsDebug == null ? "not found" : jsDebug.toString())))
                 .addComponent(skipInternals)
                 .addComponent(reuseBrowser)
+                .addComponent(exploreLocators)
                 .addComponent(showBrowser)
                 .addComponent(pauseOnFailure)
                 .addSeparator()
@@ -117,6 +120,7 @@ public final class PwConfigurable implements SearchableConfigurable {
                 || showBrowser.isSelected() != s.showBrowserWhenDebugging
                 || pauseOnFailure.isSelected() != s.pauseOnFailure
                 || reuseBrowser.isSelected() != s.reuseBrowser
+                || exploreLocators.isSelected() != s.exploreLocators
                 || disableJestMarker.isSelected() != s.disableGigaJestMarker
                 || hideTsxMarker.isSelected() != s.hideGigaTsxMarker;
     }
@@ -139,6 +143,7 @@ public final class PwConfigurable implements SearchableConfigurable {
             for (var project : ProjectManager.getInstance().getOpenProjects()) dev.pwtoolkit.run.PwBrowserServer.getInstance(project).stopAll();
         }
         s.reuseBrowser = reuseBrowser.isSelected();
+        s.exploreLocators = exploreLocators.isSelected();
         if (disableJestMarker.isSelected() && !s.disableGigaJestMarker) dev.pwtoolkit.compat.GigaJestMarkerWorkaround.apply();
         s.disableGigaJestMarker = disableJestMarker.isSelected();
         s.hideGigaTsxMarker = hideTsxMarker.isSelected();
@@ -164,6 +169,7 @@ public final class PwConfigurable implements SearchableConfigurable {
         showBrowser.setSelected(s.showBrowserWhenDebugging);
         pauseOnFailure.setSelected(s.pauseOnFailure);
         reuseBrowser.setSelected(s.reuseBrowser);
+        exploreLocators.setSelected(s.exploreLocators);
         disableJestMarker.setSelected(s.disableGigaJestMarker);
         hideTsxMarker.setSelected(s.hideGigaTsxMarker);
     }

@@ -31,6 +31,8 @@ public final class PwSettings implements PersistentStateComponent<PwSettings.Sta
         public boolean rainbowBrackets = true;
         /** Keep one browser open between runs (like "Show browser" in VS Code). */
         public boolean reuseBrowser = false;
+        /** Highlight the locator under the caret in the kept-open browser. */
+        public boolean exploreLocators = true;
     }
 
     private StateBean state = new StateBean();
