@@ -24,19 +24,19 @@ final class TsSemanticColors {
             case "interface" -> key(typeScript, "INTERFACE_NAME", "INTERFACE_NAME", DefaultLanguageHighlighterColors.INTERFACE_NAME);
             case "enum" -> key(typeScript, "ENUM", "CLASS_NAME", DefaultLanguageHighlighterColors.CLASS_NAME);
             case "enumMember" -> key(typeScript, "ENUM_FIELD", "STATIC_FIELD", DefaultLanguageHighlighterColors.STATIC_FIELD);
-            case "typeParameter" -> webStorm("TS.TYPE_PARAMETER", key(typeScript, "TYPE_PARAMETER", "CLASS_NAME", DefaultLanguageHighlighterColors.CLASS_REFERENCE));
+            case "typeParameter" -> webStorm("TS.TYPE_PARAMETER", DefaultLanguageHighlighterColors.CLASS_REFERENCE, key(typeScript, "TYPE_PARAMETER", "CLASS_NAME", DefaultLanguageHighlighterColors.CLASS_REFERENCE));
             case "type" -> key(typeScript, "TYPE_ALIAS", "CLASS_NAME", DefaultLanguageHighlighterColors.CLASS_REFERENCE);
             case "namespace" -> key(typeScript, "MODULE_IDENTIFIER", "MODULE_IDENTIFIER", DefaultLanguageHighlighterColors.IDENTIFIER);
             case "parameter" -> key(typeScript, "PARAMETER", "PARAMETER", DefaultLanguageHighlighterColors.PARAMETER);
             case "variable" -> token.modifiers().contains("local")
-                    ? webStorm("JS.LOCAL_VARIABLE", key(typeScript, "LOCAL_VARIABLE", "LOCAL_VARIABLE", DefaultLanguageHighlighterColors.LOCAL_VARIABLE))
+                    ? webStorm("JS.LOCAL_VARIABLE", DefaultLanguageHighlighterColors.LOCAL_VARIABLE, key(typeScript, "LOCAL_VARIABLE", "LOCAL_VARIABLE", DefaultLanguageHighlighterColors.LOCAL_VARIABLE))
                     : firstVisible(DefaultLanguageHighlighterColors.GLOBAL_VARIABLE, typeScript ? "TS_GLOBAL_VARIABLE" : null, "JS.GLOBAL_VARIABLE");
             case "property" -> isStatic
                     ? key(typeScript, "STATIC_FIELD", "STATIC_FIELD", DefaultLanguageHighlighterColors.STATIC_FIELD)
                     : key(typeScript, "INSTANCE_FIELD", "INSTANCE_FIELD", DefaultLanguageHighlighterColors.INSTANCE_FIELD);
             case "method" -> isStatic
                     ? key(typeScript, "STATIC_METHOD", "STATIC_METHOD", DefaultLanguageHighlighterColors.STATIC_METHOD)
-                    : webStorm("JS.INSTANCE_MEMBER_FUNCTION", key(typeScript, "INSTANCE_METHOD", "INSTANCE_METHOD", DefaultLanguageHighlighterColors.INSTANCE_METHOD));
+                    : webStorm("JS.INSTANCE_MEMBER_FUNCTION", DefaultLanguageHighlighterColors.INSTANCE_METHOD, key(typeScript, "INSTANCE_METHOD", "INSTANCE_METHOD", DefaultLanguageHighlighterColors.INSTANCE_METHOD));
             case "function" -> declaration
                     ? token.modifiers().contains("local")
                     ? key(typeScript, "LOCAL_FUNCTION_DECLARATION", "LOCAL_FUNCTION_DECLARATION", DefaultLanguageHighlighterColors.FUNCTION_DECLARATION)
@@ -44,7 +44,7 @@ final class TsSemanticColors {
                     : token.modifiers().contains("local")
                     ? DefaultLanguageHighlighterColors.FUNCTION_CALL
                     // imported or global functions (test, expect, ...), purple like in WebStorm
-                    : webStorm("JS.GLOBAL_FUNCTION", DefaultLanguageHighlighterColors.FUNCTION_CALL);
+                    : webStorm("JS.GLOBAL_FUNCTION", DefaultLanguageHighlighterColors.FUNCTION_DECLARATION, DefaultLanguageHighlighterColors.FUNCTION_CALL);
             default -> null;
         };
     }
@@ -53,13 +53,15 @@ final class TsSemanticColors {
      * Keys of JetBrains' JavaScript plugin (WebStorm). The platform color schemes (Darcula, Dark, Islands Dark) define
      * colors for them, so using them gives the same look as WebStorm; registered here when GigaIDE has not done it.
      */
-    private static @NotNull TextAttributesKey webStorm(@NotNull String name, @NotNull TextAttributesKey otherwise) {
+    private static @NotNull TextAttributesKey webStorm(@NotNull String name, @NotNull TextAttributesKey base,
+                                                      @NotNull TextAttributesKey otherwise) {
         TextAttributesKey key = resolve(name, null);
         if (key == null) {
-            key = KEYS.computeIfAbsent(name, n -> TextAttributesKey.createTextAttributesKey(n, otherwise));
+            // same fallback as in the JavaScript plugin, e.g. JS.GLOBAL_FUNCTION -> DEFAULT_FUNCTION_DECLARATION
+            key = KEYS.computeIfAbsent(name, n -> TextAttributesKey.createTextAttributesKey(n, base));
         }
         var scheme = com.intellij.openapi.editor.colors.EditorColorsManager.getInstance().getGlobalScheme();
-        return isVisible(scheme.getAttributes(key)) ? key : otherwise;
+        return isVisible(scheme, scheme.getAttributes(key)) ? key : otherwise;
     }
 
     private static @NotNull TextAttributesKey key(boolean typeScript, @NotNull String tsName, @NotNull String jsName,
@@ -76,14 +78,21 @@ final class TsSemanticColors {
         for (String name : names) {
             if (name == null) continue;
             TextAttributesKey key = resolve(name, null);
-            if (key != null && isVisible(scheme.getAttributes(key))) return key;
+            if (key != null && isVisible(scheme, scheme.getAttributes(key))) return key;
         }
         return fallback;
     }
 
-    private static boolean isVisible(@Nullable com.intellij.openapi.editor.markup.TextAttributes attributes) {
-        return attributes != null && (attributes.getForegroundColor() != null || attributes.getFontType() != 0
-                || attributes.getEffectColor() != null && attributes.getEffectType() != null);
+    /** Styled differently from plain code (a foreground equal to the default text color does not count). */
+    private static boolean isVisible(@NotNull com.intellij.openapi.editor.colors.EditorColorsScheme scheme,
+                                     @Nullable com.intellij.openapi.editor.markup.TextAttributes attributes) {
+        if (attributes == null) return false;
+        if (attributes.getFontType() != 0 || attributes.getEffectColor() != null && attributes.getEffectType() != null) return true;
+        java.awt.Color foreground = attributes.getForegroundColor();
+        if (foreground == null) return false;
+        var identifier = scheme.getAttributes(DefaultLanguageHighlighterColors.IDENTIFIER);
+        return !foreground.equals(scheme.getDefaultForeground())
+                && (identifier == null || !foreground.equals(identifier.getForegroundColor()));
     }
 
     private static final Map<String, TextAttributesKey> KEYS = new ConcurrentHashMap<>();

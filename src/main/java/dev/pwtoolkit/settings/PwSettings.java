@@ -26,6 +26,7 @@ public final class PwSettings implements PersistentStateComponent<PwSettings.Sta
         public boolean showBrowserWhenDebugging = true;
         public boolean pauseOnFailure = true;
         public boolean disableGigaJestMarker = true;
+        public boolean rainbowBrackets = true;
     }
 
     private StateBean state = new StateBean();

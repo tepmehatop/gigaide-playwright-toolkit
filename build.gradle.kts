@@ -66,5 +66,6 @@ tasks.withType<JavaCompile>().configureEach {
 tasks.test {
     // integration tests use the sample project in samples/playwright-offline (run `npm install` there first)
     systemProperty("pwtoolkit.sample", file("samples/playwright-offline").absolutePath)
+    providers.systemProperty("pwtoolkit.report.file").orNull?.let { systemProperty("pwtoolkit.report.file", it) }
     testLogging { events("passed", "failed", "skipped"); exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL; showStandardStreams = true }
 }

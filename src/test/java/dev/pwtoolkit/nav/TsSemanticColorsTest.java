@@ -12,6 +12,8 @@ public class TsSemanticColorsTest extends BasePlatformTestCase {
         TextAttributesKey jsKey = TextAttributesKey.createTextAttributesKey("JS_INTERFACE_TEST_FALLBACK",
                 DefaultLanguageHighlighterColors.CLASS_REFERENCE);
         TextAttributesKey gigaKey = TextAttributesKey.createTextAttributesKey("TS_INTERFACE_NAME", jsKey);
+        com.intellij.openapi.editor.colors.EditorColorsManager.getInstance().getGlobalScheme().setAttributes(gigaKey,
+                new com.intellij.openapi.editor.markup.TextAttributes(java.awt.Color.RED, null, null, null, java.awt.Font.PLAIN));
 
         TextAttributesKey ours = TsSemanticColors.keyFor(new TsLanguageService.SemanticToken(0, 1, "interface", Set.of()), true);
         assertSame(gigaKey, ours);

@@ -78,35 +78,69 @@ public final class TsSemanticHighlighter implements Disposable {
         }, DELAY_MS);
     }
 
+    /** A bracket and its nesting depth, for rainbow brackets. */
+    record Bracket(int offset, int depth) {
+    }
+
     /** Requests tokens (blocking, call off the EDT in production) and applies them on the EDT. */
     public void highlight(@NotNull VirtualFile file) {
         if (project.isDisposed()) return;
         Document document = ApplicationManager.getApplication().runReadAction(
                 (Computable<Document>) () -> FileDocumentManager.getInstance().getDocument(file));
         if (document == null) return;
-        if (!PwSettings.getInstance().getState().semanticHighlighting) {
-            ApplicationManager.getApplication().invokeLater(() -> apply(document, document.getModificationStamp(), List.of(), true), project.getDisposed());
-            return;
-        }
+        PwSettings.StateBean settings = PwSettings.getInstance().getState();
         long stamp = document.getModificationStamp();
         CharSequence text = document.getImmutableCharSequence();
-        CompletableFuture<List<TsLanguageService.SemanticToken>> future = ApplicationManager.getApplication().runReadAction(
-                (Computable<CompletableFuture<List<TsLanguageService.SemanticToken>>>) () ->
-                        TsLanguageService.getInstance(project).semanticTokens(file, document));
-        if (future == null) return;
-        List<TsLanguageService.SemanticToken> tokens;
-        try {
-            tokens = future.get(15, TimeUnit.SECONDS);
-        } catch (Exception e) {
-            LOG.info("[pwtoolkit] semantic highlighting: tokens request failed for " + file.getName(), e);
-            return;
-        }
-        List<TsLanguageService.SemanticToken> allTokens = withImportBindings(text, tokens);
         boolean typeScript = isTypeScript(file);
-        ApplicationManager.getApplication().invokeLater(() -> apply(document, stamp, allTokens, typeScript), project.getDisposed());
+
+        List<Bracket> brackets = settings.rainbowBrackets
+                ? ApplicationManager.getApplication().runReadAction((Computable<List<Bracket>>) () -> collectBrackets(file))
+                : List.of();
+        List<TsLanguageService.SemanticToken> tokens = List.of();
+        if (settings.semanticHighlighting) {
+            CompletableFuture<List<TsLanguageService.SemanticToken>> future = ApplicationManager.getApplication().runReadAction(
+                    (Computable<CompletableFuture<List<TsLanguageService.SemanticToken>>>) () ->
+                            TsLanguageService.getInstance(project).semanticTokens(file, document));
+            if (future != null) {
+                try {
+                    tokens = withImportBindings(text, future.get(15, TimeUnit.SECONDS));
+                } catch (Exception e) {
+                    LOG.info("[pwtoolkit] semantic highlighting: tokens request failed for " + file.getName(), e);
+                }
+            }
+        }
+        List<TsLanguageService.SemanticToken> allTokens = tokens;
+        ApplicationManager.getApplication().invokeLater(() -> apply(document, stamp, allTokens, brackets, typeScript), project.getDisposed());
     }
 
-    private void apply(@NotNull Document document, long stamp, @NotNull List<TsLanguageService.SemanticToken> tokens, boolean typeScript) {
+    private @NotNull List<Bracket> collectBrackets(@NotNull VirtualFile file) {
+        com.intellij.psi.PsiFile psiFile = com.intellij.psi.PsiManager.getInstance(project).findFile(file);
+        List<Bracket> result = new ArrayList<>();
+        if (psiFile == null) return result;
+        java.util.Map<Character, Integer> depth = new java.util.HashMap<>();
+        for (com.intellij.psi.PsiElement leaf = com.intellij.psi.util.PsiTreeUtil.firstChild(psiFile); leaf != null;
+             leaf = com.intellij.psi.util.PsiTreeUtil.nextLeaf(leaf)) {
+            if (leaf.getTextLength() != 1) continue; // strings, comments and template parts are longer leaves
+            char c = leaf.getText().charAt(0);
+            int index = "([{".indexOf(c);
+            if (index >= 0) {
+                int d = depth.merge(c, 1, Integer::sum) - 1;
+                result.add(new Bracket(leaf.getTextOffset(), d));
+                continue;
+            }
+            index = ")]}".indexOf(c);
+            if (index >= 0) {
+                char open = "([{".charAt(index);
+                int d = Math.max(depth.merge(open, -1, Integer::sum), 0);
+                depth.put(open, d);
+                result.add(new Bracket(leaf.getTextOffset(), d));
+            }
+        }
+        return result;
+    }
+
+    private void apply(@NotNull Document document, long stamp, @NotNull List<TsLanguageService.SemanticToken> tokens,
+                       @NotNull List<Bracket> brackets, boolean typeScript) {
         if (document.getModificationStamp() != stamp) return; // a newer request is on its way
         MarkupModel model = DocumentMarkupModel.forDocument(document, project, true);
         List<RangeHighlighter> old = document.getUserData(HIGHLIGHTERS);
@@ -117,14 +151,33 @@ public final class TsSemanticHighlighter implements Disposable {
         }
         List<RangeHighlighter> added = new ArrayList<>();
         int length = document.getTextLength();
+        CharSequence text = document.getImmutableCharSequence();
+        // "Semantic highlighting" in Settings | Editor | Color Scheme | Language Defaults: unique colors for
+        // parameters and local variables, exactly like WebStorm's JSRainbowVisitor (off by default there too)
+        com.intellij.lang.Language language = com.intellij.lang.Language.findLanguageByID(typeScript ? "TypeScript" : "JavaScript");
+        boolean rainbow = language != null && com.intellij.codeHighlighting.RainbowHighlighter.isRainbowEnabledWithInheritance(
+                com.intellij.openapi.editor.colors.EditorColorsManager.getInstance().getGlobalScheme(), language);
+        TextAttributesKey[] rainbowKeys = com.intellij.codeHighlighting.RainbowHighlighter.RAINBOW_COLOR_KEYS;
         for (TsLanguageService.SemanticToken token : tokens) {
-            TextAttributesKey key = TsSemanticColors.keyFor(token, typeScript);
             int end = token.start() + token.length();
-            if (key == null || end > length) continue;
+            if (end > length) continue;
+            TextAttributesKey key = rainbow && isRainbowTarget(token)
+                    ? rainbowKeys[Math.floorMod(text.subSequence(token.start(), end).toString().hashCode(), rainbowKeys.length)]
+                    : TsSemanticColors.keyFor(token, typeScript);
+            if (key == null) continue;
             added.add(model.addRangeHighlighter(key, token.start(), end, HighlighterLayer.ADDITIONAL_SYNTAX, HighlighterTargetArea.EXACT_RANGE));
+        }
+        for (Bracket bracket : brackets) {
+            if (bracket.offset() >= length) continue;
+            TextAttributesKey key = rainbowKeys[bracket.depth() % rainbowKeys.length];
+            added.add(model.addRangeHighlighter(key, bracket.offset(), bracket.offset() + 1, HighlighterLayer.ADDITIONAL_SYNTAX, HighlighterTargetArea.EXACT_RANGE));
         }
         document.putUserData(HIGHLIGHTERS, added);
         LOG.debug("[pwtoolkit] semantic highlighting: " + added.size() + " ranges in " + FileDocumentManager.getInstance().getFile(document));
+    }
+
+    private static boolean isRainbowTarget(@NotNull TsLanguageService.SemanticToken token) {
+        return "parameter".equals(token.type()) || "variable".equals(token.type()) && token.modifiers().contains("local");
     }
 
     private static final java.util.regex.Pattern IMPORT_CLAUSE =

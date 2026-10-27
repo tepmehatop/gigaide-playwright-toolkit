@@ -29,6 +29,7 @@ public final class PwConfigurable implements SearchableConfigurable {
     private JSpinner navigationTimeout;
     private JBCheckBox skipInternals;
     private JBCheckBox semanticHighlighting;
+    private JBCheckBox rainbowBrackets;
     private JBCheckBox showBrowser;
     private JBCheckBox pauseOnFailure;
     private JBCheckBox disableJestMarker;
@@ -55,6 +56,8 @@ public final class PwConfigurable implements SearchableConfigurable {
         navigationTimeout = new JSpinner(new SpinnerNumberModel(3000, 200, 60000, 100));
         skipInternals = new JBCheckBox("Do not step into Playwright internals (node_modules/playwright*)");
         semanticHighlighting = new JBCheckBox("Semantic highlighting (fixtures, Page Object fields and methods) from TypeScript 7");
+        rainbowBrackets = new JBCheckBox("Rainbow brackets in TS/JS files (color by nesting depth)");
+        semanticHighlighting.setToolTipText("Unique colors for parameters and local variables: Settings | Editor | Color Scheme | Language Defaults | Semantic highlighting");
         showBrowser = new JBCheckBox("Show the browser while debugging (--headed)");
         pauseOnFailure = new JBCheckBox("Pause on the failing line of a test while debugging (like VS Code)");
         disableJestMarker = new JBCheckBox("Work around GigaIDE's broken Jest gutter marker in test files (restart required)");
@@ -75,6 +78,7 @@ public final class PwConfigurable implements SearchableConfigurable {
                 .addComponentToRightColumn(hint("Default: node_modules/@typescript/typescript-<os>-<arch>/lib/tsc of the project"))
                 .addLabeledComponent("Navigation timeout, ms:", navigationTimeout)
                 .addComponent(semanticHighlighting)
+                .addComponent(rainbowBrackets)
                 .addSeparator()
                 .addLabeledComponent("vscode-js-debug folder:", jsDebugPath)
                 .addComponentToRightColumn(hint("Detected: " + (jsDebug == null ? "not found" : jsDebug.toString())))
@@ -103,6 +107,7 @@ public final class PwConfigurable implements SearchableConfigurable {
                 || (Integer) navigationTimeout.getValue() != s.navigationTimeoutMs
                 || skipInternals.isSelected() != s.skipPlaywrightInternals
                 || semanticHighlighting.isSelected() != s.semanticHighlighting
+                || rainbowBrackets.isSelected() != s.rainbowBrackets
                 || showBrowser.isSelected() != s.showBrowserWhenDebugging
                 || pauseOnFailure.isSelected() != s.pauseOnFailure
                 || disableJestMarker.isSelected() != s.disableGigaJestMarker;
@@ -119,6 +124,7 @@ public final class PwConfigurable implements SearchableConfigurable {
         s.navigationTimeoutMs = (Integer) navigationTimeout.getValue();
         s.skipPlaywrightInternals = skipInternals.isSelected();
         s.semanticHighlighting = semanticHighlighting.isSelected();
+        s.rainbowBrackets = rainbowBrackets.isSelected();
         s.showBrowserWhenDebugging = showBrowser.isSelected();
         s.pauseOnFailure = pauseOnFailure.isSelected();
         if (disableJestMarker.isSelected() && !s.disableGigaJestMarker) dev.pwtoolkit.compat.GigaJestMarkerWorkaround.apply();
@@ -141,6 +147,7 @@ public final class PwConfigurable implements SearchableConfigurable {
         navigationTimeout.setValue(s.navigationTimeoutMs);
         skipInternals.setSelected(s.skipPlaywrightInternals);
         semanticHighlighting.setSelected(s.semanticHighlighting);
+        rainbowBrackets.setSelected(s.rainbowBrackets);
         showBrowser.setSelected(s.showBrowserWhenDebugging);
         pauseOnFailure.setSelected(s.pauseOnFailure);
         disableJestMarker.setSelected(s.disableGigaJestMarker);
