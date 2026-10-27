@@ -5,7 +5,7 @@
 ## Возможности
 
 - **Go to Declaration (Cmd/Ctrl+Click)** для TS/JS: фикстуры из `test.extend<...>`, методы и поля Page Object, свойства локальных объектов, импорты, JSON.
-- **Семантическая подсветка в тестах:** фикстуры, `selectors`, методы Page Object, `test`/`expect` красятся так же, как в WebStorm.
+- **Семантическая подсветка в тестах** (цвета WebStorm): `test`/`expect`, методы и поля Page Object, имена в `import`; радужные скобки; параметры — через Semantic highlighting в Language Defaults.
 - **Run/Debug из gutter** у `test(...)` и `test.describe(...)`, запуск файла или папки из дерева проекта, «тест под курсором». Конфигурация **Playwright Test**: `--project`, `--grep`, доп. аргументы, env, `--headed`.
 - **Отладка с брейкпоинтами** в тестах, фикстурах и Page Object: step over/into/out, переменные, watches, Evaluate Expression, условные брейкпоинты, Run to Cursor.
 - **Пауза на упавшем шаге** (как в VS Code): при падении `expect` или локатора отладчик останавливается на этой строке, текст ошибки выводится в консоль.
