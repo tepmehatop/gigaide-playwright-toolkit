@@ -32,6 +32,8 @@
         <applicationConfigurable parentId="tools" instance="dev.pwtoolkit.settings.PwConfigurable"
                                  id="dev.pwtoolkit.settings" displayName="Playwright Toolkit"/>
         <additionalTextAttributes scheme="Darcula" file="colorSchemes/PwToolkitDarcula.xml"/>
+        <liveTemplateContext contextId="PLAYWRIGHT" implementation="dev.pwtoolkit.templates.PwTemplateContextType"/>
+        <defaultLiveTemplates file="/liveTemplates/Playwright.xml"/>
         <notificationGroup id="Playwright Toolkit" displayType="BALLOON"/>
     </extensions>
 
