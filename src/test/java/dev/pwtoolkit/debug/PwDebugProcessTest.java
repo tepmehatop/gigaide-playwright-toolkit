@@ -139,7 +139,7 @@ public class PwDebugProcessTest extends BasePlatformTestCase {
             String node = NodeLocator.findNode(null);
             PwLaunchSpec spec = new PwLaunchSpec(node, new File(sample, "node_modules/@playwright/test/cli.js").getPath(),
                     List.of("test", "tests/tmp-failing/failing.test.ts", "--workers=1", "--timeout=0", "--reporter=list"),
-                    sample, Map.of("PW_TEST_SOURCE_TRANSFORM", dev.pwtoolkit.run.PwDebugTransform.install().toString(),
+                    sample, Map.of("PW_TEST_SOURCE_TRANSFORM", dev.pwtoolkit.run.PwResources.install(dev.pwtoolkit.run.PwResources.DEBUG_TRANSFORM).toString(),
                     "PW_TEST_SOURCE_TRANSFORM_SCOPE", dir.getPath()), true);
             process = new PwDebugProcess(fakeSession(), spec);
             process.addBreakpoint(breakpoint(failing, 5));
@@ -166,6 +166,28 @@ public class PwDebugProcessTest extends BasePlatformTestCase {
         } finally {
             com.intellij.openapi.util.io.FileUtil.delete(dir);
         }
+    }
+
+    /** Debug shows the same test tree as Run: the reporter output reaches the IDE through js-debug. */
+    public void testDebugShowsTestTree() throws Exception {
+        File sample = new File(System.getProperty("pwtoolkit.sample"));
+        PwLaunchSpec spec = new PwLaunchSpec(NodeLocator.findNode(null), new File(sample, "node_modules/@playwright/test/cli.js").getPath(),
+                List.of("test", "tests/login/login.test.ts", "--workers=1", "--timeout=0"), sample,
+                Map.of("PW_TEST_REPORTER", dev.pwtoolkit.run.PwResources.install(dev.pwtoolkit.run.PwResources.REPORTER).toString()), true);
+        dev.pwtoolkit.run.PwRunConfiguration config = (dev.pwtoolkit.run.PwRunConfiguration)
+                dev.pwtoolkit.run.PwRunConfigurationType.getInstance().getFactory().createTemplateConfiguration(getProject());
+        config.setWorkingDirectory(sample.getPath());
+        process = new PwDebugProcess(fakeSession(), spec, new dev.pwtoolkit.tests.PwTestConsoleProperties(config,
+                com.intellij.execution.executors.DefaultDebugExecutor.getDebugExecutorInstance()));
+        var console = (com.intellij.execution.testframework.sm.runner.ui.SMTRunnerConsoleView) process.createConsole();
+        com.intellij.openapi.util.Disposer.register(getTestRootDisposable(), console);
+        process.sessionInitialized();
+        assertTrue("debuggee did not finish", process.getProcessHandler().waitFor(120_000));
+        com.intellij.testFramework.PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue();
+        var tests = console.getResultsViewer().getTestsRootNode().getAllTests();
+        var names = tests.stream().map(t -> t.getName()).toList();
+        assertTrue(names.toString(), names.contains("admin sees greeting") && names.contains("header shows title"));
+        assertTrue(tests.stream().filter(t -> t.isLeaf()).allMatch(t -> t.isPassed()));
     }
 
     private Stop nextStop() throws InterruptedException {

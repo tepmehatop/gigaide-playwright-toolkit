@@ -26,6 +26,9 @@ public record PwLaunchSpec(@NotNull String node,
                            @NotNull Map<String, String> env,
                            boolean passParentEnv) {
 
+    /** Where the reporter writes attachments (screenshots, traces) of the run, for the IDE actions. */
+    public static final String RESULTS_FILE_ENV = "PWTK_RESULTS_FILE";
+
     public static @NotNull PwLaunchSpec create(@NotNull PwRunConfiguration config, boolean debug) throws ExecutionException {
         File workDir = new File(StringUtil.notNullize(config.getWorkingDirectory()));
         if (!workDir.isDirectory()) throw new ExecutionException("Working directory does not exist: " + workDir);
@@ -40,8 +43,13 @@ public record PwLaunchSpec(@NotNull String node,
 
         List<String> args = new ArrayList<>();
         args.add("test");
-        String target = relativeTarget(workDir, config.getTestPath());
-        if (!target.isEmpty()) args.add(config.getTestLine() > 0 ? target + ":" + config.getTestLine() : target);
+        if (!config.getRerunTargets().isEmpty()) {
+            // "Rerun Failed Tests": the failed tests as file:line filters
+            for (String rerun : config.getRerunTargets()) args.add(relativeTarget(workDir, rerun));
+        } else {
+            String target = relativeTarget(workDir, config.getTestPath());
+            if (!target.isEmpty()) args.add(config.getTestLine() > 0 ? target + ":" + config.getTestLine() : target);
+        }
         if (!StringUtil.isEmptyOrSpaces(config.getProjectName())) args.add("--project=" + config.getProjectName().trim());
         if (!StringUtil.isEmptyOrSpaces(config.getTestName())) {
             args.add("--grep");
@@ -59,10 +67,13 @@ public record PwLaunchSpec(@NotNull String node,
             // same as the VS Code extension: `playwright` helper object in the browser DevTools console
             env.put("PWDEBUG", "console");
             if (settings.pauseOnFailure) {
-                env.put("PW_TEST_SOURCE_TRANSFORM", PwDebugTransform.install().toString());
+                env.put("PW_TEST_SOURCE_TRANSFORM", PwResources.install(PwResources.DEBUG_TRANSFORM).toString());
                 env.put("PW_TEST_SOURCE_TRANSFORM_SCOPE", transformScope(workDir, config.getTestPath()));
             }
         }
+        // the IDE test tree: added next to the reporters of playwright.config (html, extended report...), not instead of them
+        env.put("PW_TEST_REPORTER", PwResources.install(PwResources.REPORTER).toString());
+        env.put(RESULTS_FILE_ENV, PwResources.dir().resolve("results").resolve(java.util.UUID.randomUUID() + ".json").toString());
         env.putAll(config.getEnvData().getEnvs());
         return new PwLaunchSpec(node, cli, args, workDir, env, config.getEnvData().isPassParentEnvs());
     }

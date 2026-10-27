@@ -20,6 +20,8 @@ import org.jetbrains.annotations.Nullable;
 
 public final class PwRunConfiguration extends LocatableConfigurationBase<PwRunConfigurationOptions> {
     private EnvironmentVariablesData envData = EnvironmentVariablesData.DEFAULT;
+    /** Not persisted: set on the copy created by "Rerun Failed Tests" (absolute path:line of each failed test). */
+    private java.util.List<String> rerunTargets = java.util.List.of();
 
     PwRunConfiguration(@NotNull Project project, @NotNull ConfigurationFactory factory, @Nullable String name) {
         super(project, factory, name);
@@ -54,6 +56,9 @@ public final class PwRunConfiguration extends LocatableConfigurationBase<PwRunCo
 
     public boolean isHeaded() { return getOptions().isHeaded(); }
     public void setHeaded(boolean value) { getOptions().setHeaded(value); }
+
+    public @NotNull java.util.List<String> getRerunTargets() { return rerunTargets; }
+    public void setRerunTargets(@NotNull java.util.List<String> rerunTargets) { this.rerunTargets = java.util.List.copyOf(rerunTargets); }
 
     public @NotNull EnvironmentVariablesData getEnvData() { return envData; }
     public void setEnvData(@NotNull EnvironmentVariablesData envData) { this.envData = envData; }
