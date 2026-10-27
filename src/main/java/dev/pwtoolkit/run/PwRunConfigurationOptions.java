@@ -12,6 +12,13 @@ public class PwRunConfigurationOptions extends LocatableRunConfigurationOptions 
     private final StoredProperty<String> extraArgs = string("").provideDelegate(this, "extraArgs");
     private final StoredProperty<String> nodePath = string("").provideDelegate(this, "nodePath");
     private final StoredProperty<Boolean> headed = property(false).provideDelegate(this, "headed");
+    private final StoredProperty<String> grepInvert = string("").provideDelegate(this, "grepInvert");
+    private final StoredProperty<String> retries = string("").provideDelegate(this, "retries");
+    private final StoredProperty<Integer> repeatEach = property(0).provideDelegate(this, "repeatEach");
+    private final StoredProperty<Integer> maxFailures = property(0).provideDelegate(this, "maxFailures");
+    private final StoredProperty<String> workers = string("").provideDelegate(this, "workers");
+    private final StoredProperty<Boolean> lastFailed = property(false).provideDelegate(this, "lastFailed");
+    private final StoredProperty<String> traceMode = string("").provideDelegate(this, "traceMode");
 
     public String getWorkingDirectory() { return workingDirectory.getValue(this); }
     public void setWorkingDirectory(String value) { workingDirectory.setValue(this, value); }
@@ -36,4 +43,25 @@ public class PwRunConfigurationOptions extends LocatableRunConfigurationOptions 
 
     public boolean isHeaded() { return headed.getValue(this); }
     public void setHeaded(boolean value) { headed.setValue(this, value); }
+
+    public String getGrepInvert() { return grepInvert.getValue(this); }
+    public void setGrepInvert(String value) { grepInvert.setValue(this, value); }
+
+    public String getRetries() { return retries.getValue(this); }
+    public void setRetries(String value) { retries.setValue(this, value); }
+
+    public int getRepeatEach() { return repeatEach.getValue(this); }
+    public void setRepeatEach(int value) { repeatEach.setValue(this, value); }
+
+    public int getMaxFailures() { return maxFailures.getValue(this); }
+    public void setMaxFailures(int value) { maxFailures.setValue(this, value); }
+
+    public String getWorkers() { return workers.getValue(this); }
+    public void setWorkers(String value) { workers.setValue(this, value); }
+
+    public boolean isLastFailed() { return lastFailed.getValue(this); }
+    public void setLastFailed(boolean value) { lastFailed.setValue(this, value); }
+
+    public String getTraceMode() { return traceMode.getValue(this); }
+    public void setTraceMode(String value) { traceMode.setValue(this, value); }
 }

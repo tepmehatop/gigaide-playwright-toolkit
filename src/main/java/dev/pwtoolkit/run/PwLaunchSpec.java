@@ -55,6 +55,16 @@ public record PwLaunchSpec(@NotNull String node,
             args.add("--grep");
             args.add(config.getTestName());
         }
+        if (!StringUtil.isEmptyOrSpaces(config.getGrepInvert())) {
+            args.add("--grep-invert");
+            args.add(config.getGrepInvert());
+        }
+        if (!StringUtil.isEmptyOrSpaces(config.getRetries())) args.add("--retries=" + config.getRetries().trim());
+        if (config.getRepeatEach() > 0) args.add("--repeat-each=" + config.getRepeatEach());
+        if (config.getMaxFailures() > 0) args.add("--max-failures=" + config.getMaxFailures());
+        if (!StringUtil.isEmptyOrSpaces(config.getWorkers())) args.add("--workers=" + config.getWorkers().trim());
+        if (config.isLastFailed() && config.getRerunTargets().isEmpty()) args.add("--last-failed");
+        if (!StringUtil.isEmptyOrSpaces(config.getTraceMode())) args.add("--trace=" + config.getTraceMode().trim());
         PwSettings.StateBean settings = PwSettings.getInstance().getState();
         if (config.isHeaded() || (debug && settings.showBrowserWhenDebugging)) args.add("--headed");
         List<String> extra = ParametersListUtil.parse(StringUtil.notNullize(config.getExtraArgs()));
@@ -62,7 +72,7 @@ public record PwLaunchSpec(@NotNull String node,
         Map<String, String> env = new LinkedHashMap<>();
         if (debug) {
             // one worker keeps the order predictable, no timeout lets you sit on a breakpoint
-            if (extra.stream().noneMatch(a -> a.startsWith("--workers") || a.equals("-j"))) args.add("--workers=1");
+            if (args.stream().noneMatch(a -> a.startsWith("--workers") || a.equals("-j"))) args.add("--workers=1");
             if (extra.stream().noneMatch(a -> a.startsWith("--timeout"))) args.add("--timeout=0");
             // same as the VS Code extension: `playwright` helper object in the browser DevTools console
             env.put("PWDEBUG", "console");
@@ -103,7 +113,7 @@ public record PwLaunchSpec(@NotNull String node,
         return FileUtil.toSystemIndependentName(relative != null ? relative : target.getPath());
     }
 
-    private static @Nullable String findCli(@NotNull Path workDir) {
+    public static @Nullable String findCli(@NotNull Path workDir) {
         for (Path dir = workDir; dir != null; dir = dir.getParent()) {
             for (String candidate : List.of("node_modules/@playwright/test/cli.js", "node_modules/playwright/cli.js")) {
                 File cli = dir.resolve(candidate).toFile();
