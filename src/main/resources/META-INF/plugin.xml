@@ -1,0 +1,45 @@
+<idea-plugin>
+    <id>dev.pwtoolkit.gigaide</id>
+    <name>Playwright Toolkit for GigaIDE</name>
+    <vendor url="https://github.com/tepmehatop/gigaide-playwright-toolkit">tepmehatop</vendor>
+    <description><![CDATA[
+    Tools for writing Playwright tests in TypeScript/JavaScript in GigaIDE (and other IntelliJ-based IDEs without
+    the commercial JavaScript plugin):
+    <ul>
+      <li><b>Go to Declaration</b> (Ctrl/Cmd+Click) for TS/JS resolved by the native TypeScript 7 language server:
+          fixtures from <code>test.extend</code>, Page Object methods and fields, local object properties, imports, JSON.</li>
+      <li><b>Playwright Test</b> run configuration with Run/Debug gutter icons next to <code>test(...)</code> and
+          <code>test.describe(...)</code>.</li>
+      <li><b>Debugging with breakpoints</b> in tests, fixtures and Page Objects (via vscode-js-debug, shipped with GigaIDE):
+          stepping, variables, watches, Evaluate Expression, conditional breakpoints.</li>
+    </ul>
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <gotoDeclarationHandler implementation="dev.pwtoolkit.nav.TsGotoDeclarationHandler" order="first"/>
+
+        <configurationType implementation="dev.pwtoolkit.run.PwRunConfigurationType"/>
+        <runConfigurationProducer implementation="dev.pwtoolkit.run.PwConfigurationProducer"/>
+
+        <runLineMarkerContributor language="TypeScript" implementationClass="dev.pwtoolkit.run.PwTestLineMarkerContributor"/>
+        <runLineMarkerContributor language="JavaScript" implementationClass="dev.pwtoolkit.run.PwTestLineMarkerContributor"/>
+        <runLineMarkerContributor language="TSX" implementationClass="dev.pwtoolkit.run.PwTestLineMarkerContributor"/>
+        <programRunner implementation="dev.pwtoolkit.debug.PwDebugRunner"/>
+        <xdebugger.breakpointType implementation="dev.pwtoolkit.debug.PwLineBreakpointType"/>
+
+        <applicationConfigurable parentId="tools" instance="dev.pwtoolkit.settings.PwConfigurable"
+                                 id="dev.pwtoolkit.settings" displayName="Playwright Toolkit"/>
+        <notificationGroup id="Playwright Toolkit" displayType="BALLOON"/>
+    </extensions>
+
+    <applicationListeners>
+        <listener class="dev.pwtoolkit.compat.GigaJestMarkerWorkaround" topic="com.intellij.ide.AppLifecycleListener"/>
+    </applicationListeners>
+
+    <projectListeners>
+        <listener class="dev.pwtoolkit.nav.TsWarmUpListener"
+                  topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"/>
+    </projectListeners>
+</idea-plugin>

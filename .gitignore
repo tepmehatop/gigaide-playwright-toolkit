@@ -1,0 +1,7 @@
+.gradle/
+build/
+.idea/
+.intellijPlatform/
+samples/*/node_modules/
+samples/*/test-results/
+samples/*/playwright-report/

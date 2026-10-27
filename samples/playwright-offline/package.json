@@ -1,0 +1,14 @@
+{
+  "name": "playwright-offline-sample",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "npx playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "@types/node": "^20.11.17",
+    "typescript": "^7.0.2"
+  }
+}
