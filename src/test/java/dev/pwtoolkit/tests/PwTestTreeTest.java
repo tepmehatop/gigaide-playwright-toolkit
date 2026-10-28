@@ -171,7 +171,7 @@ public class PwTestTreeTest extends BasePlatformTestCase {
         assertTrue(report, lines.stream().anyMatch(l -> l.startsWith("✓ Node.js")));
         assertTrue(report, lines.stream().anyMatch(l -> l.startsWith("✓ Playwright: Version 1.")));
         assertTrue(report, lines.stream().anyMatch(l -> l.startsWith("✓ Chrome for Testing")));
-        assertTrue(report, lines.stream().anyMatch(l -> l.startsWith("✓ TypeScript 7")));
+        assertTrue(report, lines.stream().anyMatch(l -> l.startsWith("✓ TypeScript server auto") && l.contains("TypeScript 7 ")));
         assertTrue(report, lines.stream().anyMatch(l -> l.startsWith("✓ vscode-js-debug")));
     }
 }

@@ -14,13 +14,26 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
-/** Talks to the real TypeScript 7 server installed in samples/playwright-offline/node_modules. */
+/** Talks to the real TypeScript 7 server installed in samples/playwright-offline/node_modules (subclasses: Node.js servers). */
 public class TsNavigationTest extends BasePlatformTestCase {
     private VirtualFile sample;
+
+    private String savedBackend;
+    private String savedServerPath;
+
+    /** Subclasses run the same checks with the Node.js servers: setting value and tsserver.js to use. */
+    protected String backend() {
+        return "native";
+    }
 
     @Override
     protected void setUp() throws Exception {
         super.setUp();
+        var state = dev.pwtoolkit.settings.PwSettings.getInstance().getState();
+        savedBackend = state.tsBackend;
+        savedServerPath = state.tsServerPath;
+        state.tsBackend = backend();
+        state.tsServerPath = backend().equals("native") ? "" : System.getProperty("pwtoolkit.ts5");
         sample = LocalFileSystem.getInstance().refreshAndFindFileByPath(System.getProperty("pwtoolkit.sample"));
         assertNotNull("sample project not found", sample);
     }
@@ -29,6 +42,9 @@ public class TsNavigationTest extends BasePlatformTestCase {
     protected void tearDown() throws Exception {
         try {
             TsLanguageService.getInstance(getProject()).restartAll();
+            var state = dev.pwtoolkit.settings.PwSettings.getInstance().getState();
+            state.tsBackend = savedBackend;
+            state.tsServerPath = savedServerPath;
         } finally {
             super.tearDown();
         }
@@ -108,7 +124,7 @@ public class TsNavigationTest extends BasePlatformTestCase {
         CompletableFuture<List<TsLanguageService.Location>> future = ApplicationManager.getApplication().runReadAction(
                 (Computable<CompletableFuture<List<TsLanguageService.Location>>>) () ->
                         TsLanguageService.getInstance(getProject()).definition(file, document, offset));
-        assertNotNull("language server was not started", future);
+        assertNotNull("language server was not started: " + TsLanguageService.getInstance(getProject()).describe(file), future);
         List<TsLanguageService.Location> locations = future.get(30, TimeUnit.SECONDS);
         assertFalse("no definition for " + needle, locations.isEmpty());
         TsLanguageService.Location location = locations.get(0);

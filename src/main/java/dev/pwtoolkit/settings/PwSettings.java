@@ -17,7 +17,10 @@ public final class PwSettings implements PersistentStateComponent<PwSettings.Sta
 
     public static final class StateBean {
         public String nodePath = "";
+        /** Native TypeScript 7 binary, or a TypeScript 5/6 lib/tsserver.js. */
         public String tsServerPath = "";
+        /** auto | native | tsserver | tsls; empty = the default of this plugin build. */
+        public String tsBackend = "";
         public String jsDebugPath = "";
         public boolean navigationEnabled = true;
         public int navigationTimeoutMs = 3000;

@@ -135,7 +135,7 @@ public final class PwToolsActions {
         }
     }
 
-    /** Node, Playwright, browsers, TypeScript 7 and js-debug: what the plugin will use, with problems highlighted. */
+    /** Node, Playwright, browsers, the TypeScript server and js-debug: what the plugin will use, with problems highlighted. */
     public static final class CheckEnvironment extends Base {
         @Override
         public void actionPerformed(@NotNull AnActionEvent e) {
@@ -170,8 +170,15 @@ public final class PwToolsActions {
             }
             if (!any) lines.add("? Browsers: cannot check (" + dryRun.lines().findFirst().orElse("") + ")");
         }
-        Path ts = TsServerLocator.find(workDir.toPath());
-        lines.add(mark(ts != null) + " TypeScript 7 (navigation, highlighting): " + (ts == null ? "not found, add typescript@^7 to devDependencies" : ts));
+        TsServerLocator.Backend backend = TsServerLocator.backend();
+        boolean nativeUsed = backend == TsServerLocator.Backend.AUTO || backend == TsServerLocator.Backend.NATIVE;
+        boolean nodeUsed = backend != TsServerLocator.Backend.NATIVE;
+        Path ts = nativeUsed ? TsServerLocator.find(workDir.toPath()) : null;
+        TsServerLocator.Tsserver tsserver = nodeUsed ? TsServerLocator.findTsserver(workDir.toPath()) : null;
+        String found = ts != null ? "TypeScript 7 " + ts
+                : tsserver != null ? "TypeScript " + tsserver.version() + " " + tsserver.path() + " via Node.js"
+                : nodeUsed ? "not found, add typescript to devDependencies" : "not found, add typescript@^7 to devDependencies";
+        lines.add(mark(ts != null || tsserver != null) + " TypeScript server " + backend.name().toLowerCase() + " (navigation, highlighting): " + found);
         TsServerLocator.explain(workDir.toPath()).forEach(line -> lines.add("    " + line));
         Path jsDebug = JsDebugLocator.findServerScript();
         lines.add(mark(jsDebug != null) + " vscode-js-debug (debugging): " + (jsDebug == null ? "not found" : jsDebug));

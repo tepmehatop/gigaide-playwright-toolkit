@@ -29,7 +29,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 final class LspClient {
     private static final Logger LOG = Logger.getInstance(LspClient.class);
-    private static final Gson GSON = new Gson();
+    /** serializeNulls: a response must carry "result": null, servers reject it otherwise. */
+    private static final Gson GSON = new com.google.gson.GsonBuilder().serializeNulls().create();
 
     private final Process process;
     private final OutputStream out;
@@ -38,6 +39,9 @@ final class LspClient {
     private final String name;
     /** Last lines of the server's stderr, for diagnostics (crashes, missing libraries...). */
     private final StringBuilder stderrTail = new StringBuilder();
+    /** Server notifications (e.g. $/progress), method -> params. */
+    private volatile java.util.function.BiConsumer<String, JsonElement> notificationListener = (method, params) -> {
+    };
 
     private LspClient(@NotNull Process process, @NotNull String name) {
         this.process = process;
@@ -50,6 +54,10 @@ final class LspClient {
     static @NotNull LspClient start(@NotNull List<String> command, @NotNull File workDir) throws IOException {
         Process process = new ProcessBuilder(command).directory(workDir).start();
         return new LspClient(process, workDir.getName());
+    }
+
+    void onNotification(@NotNull java.util.function.BiConsumer<String, JsonElement> listener) {
+        this.notificationListener = listener;
     }
 
     boolean isAlive() {
@@ -176,6 +184,8 @@ final class LspClient {
             }
         } else if (id != null) {
             answerServerRequest(id, message.get("method").getAsString(), message.get("params"));
+        } else if (hasMethod) {
+            notificationListener.accept(message.get("method").getAsString(), message.get("params"));
         }
     }
 

@@ -16,10 +16,30 @@ import java.util.List;
  * independently of the IDE's analysis (which never finishes for test files in GigaIDE).
  */
 public class TsSemanticHighlightingTest extends BasePlatformTestCase {
+    private String savedBackend;
+    private String savedServerPath;
+
+    protected String backend() {
+        return "native";
+    }
+
+    @Override
+    protected void setUp() throws Exception {
+        super.setUp();
+        var state = dev.pwtoolkit.settings.PwSettings.getInstance().getState();
+        savedBackend = state.tsBackend;
+        savedServerPath = state.tsServerPath;
+        state.tsBackend = backend();
+        state.tsServerPath = backend().equals("native") ? "" : System.getProperty("pwtoolkit.ts5");
+    }
+
     @Override
     protected void tearDown() throws Exception {
         try {
             TsLanguageService.getInstance(getProject()).restartAll();
+            var state = dev.pwtoolkit.settings.PwSettings.getInstance().getState();
+            state.tsBackend = savedBackend;
+            state.tsServerPath = savedServerPath;
         } finally {
             super.tearDown();
         }
@@ -38,6 +58,7 @@ public class TsSemanticHighlightingTest extends BasePlatformTestCase {
         Document document = myFixture.getEditor().getDocument();
         List<RangeHighlighter> highlighters = TsSemanticHighlighter.appliedHighlighters(document);
         assertNotNull("nothing applied", highlighters);
+        assertTrue(TsSemanticHighlighter.stats(myFixture.getEditor().getDocument()), !String.valueOf(TsSemanticHighlighter.stats(myFixture.getEditor().getDocument())).contains("semantic 0"));
         String text = document.getText();
 
         RangeHighlighter selectors = at(highlighters, text.indexOf("selectors.greeting"));

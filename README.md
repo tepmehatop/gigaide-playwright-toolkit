@@ -40,7 +40,7 @@
 - **Навигация:** Cmd+Click или Cmd+B по идентификатору.
 - **Запуск:** ▶ у `test(` или `test.describe(` → *Run* / *Debug*. Правый клик в теле теста → запустить этот тест. Правый клик по файлу или папке в дереве проекта → запустить все тесты в нём.
 - **Брейкпоинты:** клик по gutter в любом `.ts`/`.js`-файле.
-- **Настройки:** *Settings → Tools → Playwright Toolkit* — пути к Node, TypeScript 7 и js-debug; навигация и подсветка; браузер и пауза на ошибке при дебаге; обход Jest-маркера.
+- **Настройки:** *Settings → Tools → Playwright Toolkit* — пути к Node, TypeScript и js-debug; выбор TypeScript-сервера; навигация и подсветка; браузер и пауза на ошибке при дебаге; обход Jest-маркера.
 
 ## Связка с playwright-extended-report
 
@@ -52,7 +52,7 @@
 
 | Возможность | Реализация |
 |---|---|
-| Навигация, подсветка | LSP нативного TypeScript 7 (`tsc --lsp --stdio`): `textDocument/definition`, `semanticTokens`. Несохранённые правки передаются в сервер. |
+| Навигация, подсветка | LSP нативного TypeScript 7 (`tsc --lsp --stdio`): `textDocument/definition`, `semanticTokens`; либо на Node.js: `tsserver.js` TypeScript 5/6 проекта (`definition`, `encodedSemanticClassifications-full`) или встроенный typescript-language-server (Apache-2.0). Несохранённые правки передаются в сервер. |
 | Отладка | Свой `XDebugProcess` и DAP-клиент поверх vscode-js-debug. Playwright запускается как `node node_modules/@playwright/test/cli.js test <file>:<line> --workers=1 --timeout=0`; worker-процессы подключаются как дочерние DAP-сессии (`startDebugging`). |
 | Пауза на ошибке | Babel-плагин через `PW_TEST_SOURCE_TRANSFORM`: оборачивает шаги теста в `try/catch` с `debugger` (идея из `microsoft/playwright-vscode`). |
 
@@ -62,6 +62,7 @@
 ./gradlew test        # интеграционные тесты (нужен npm install в samples/playwright-offline)
 ./gradlew runIde      # GigaIDE-песочница с плагином
 ./gradlew buildPlugin # build/distributions/playwright-toolkit-<версия>.zip
+./gradlew buildPlugin -PtsBackend=tsserver # сервер по умолчанию: auto (без суффикса), native, tsserver или tsls
 ```
 
 Путь к GigaIDE задаётся в `gradle.properties` (`gigaIdePath`). `samples/playwright-offline` — офлайн-проект в стиле наших тестов: `tests/baseTest.ts` с фикстурами, `pages/*.page.ts`, `pages/blocks/*.block.ts`, `data/*.json`.

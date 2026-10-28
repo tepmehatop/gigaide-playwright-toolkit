@@ -107,11 +107,11 @@ public final class TsSemanticHighlighter implements Disposable {
                     (Computable<CompletableFuture<List<TsLanguageService.SemanticToken>>>) () ->
                             TsLanguageService.getInstance(project).semanticTokens(file, document));
             if (future == null) {
-                problem = "no TypeScript 7 server (see TS7 lines)";
+                problem = "no TypeScript server (see TS lines)";
             } else {
                 try {
                     tokens = withImportBindings(text, future.get(15, TimeUnit.SECONDS));
-                    if (tokens.isEmpty()) problem = "TypeScript 7 returned no tokens";
+                    if (tokens.isEmpty()) problem = "TypeScript server returned no tokens";
                 } catch (Exception e) {
                     problem = "tokens request failed: " + e;
                     LOG.info("[pwtoolkit] semantic highlighting: tokens request failed for " + file.getName(), e);

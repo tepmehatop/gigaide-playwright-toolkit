@@ -6,7 +6,9 @@ plugins {
 }
 
 group = "dev.pwtoolkit"
-version = providers.gradleProperty("pluginVersion").get()
+// -PtsBackend=auto|native|tsserver|tsls: default TypeScript server of this build (users can change it in Settings)
+val tsBackend = providers.gradleProperty("tsBackend").getOrElse("auto")
+version = providers.gradleProperty("pluginVersion").get() + if (tsBackend == "auto") "" else "-$tsBackend"
 
 java {
     sourceCompatibility = JavaVersion.VERSION_21
@@ -50,7 +52,7 @@ intellijPlatform {
     buildSearchableOptions = false
     instrumentCode = false
     pluginConfiguration {
-        changeNotes = "Test tree for Run and Debug, run options, trace/attachments/report from the tree, Show Browser and Explore locators, Tools | Playwright menu, live templates. See docs/USER_GUIDE.md."
+        changeNotes = "TypeScript servers run by Node.js (tsserver.js of the project's TypeScript 5/6, bundled typescript-language-server) for machines where native binaries may not be executed; Settings | Tools | Playwright Toolkit | TypeScript server. See CHANGELOG.md."
         ideaVersion {
             sinceBuild = "251"
             untilBuild = provider { null }
@@ -63,9 +65,16 @@ tasks.withType<JavaCompile>().configureEach {
     options.compilerArgs.add("-Xlint:deprecation")
 }
 
+tasks.processResources {
+    inputs.property("tsBackend", tsBackend)
+    filesMatching("pwtoolkit/build.properties") { expand("tsBackend" to tsBackend) }
+}
+
 tasks.test {
     // integration tests use the sample project in samples/playwright-offline (run `npm install` there first)
     systemProperty("pwtoolkit.sample", file("samples/playwright-offline").absolutePath)
+    // TypeScript 5 for the Node.js servers (tsserver.js, typescript-language-server): `npm install` in samples/typescript5
+    systemProperty("pwtoolkit.ts5", file("samples/typescript5/node_modules/typescript/lib/tsserver.js").absolutePath)
     providers.systemProperty("pwtoolkit.report.file").orNull?.let { systemProperty("pwtoolkit.report.file", it) }
     providers.systemProperty("pwtoolkit.docs.dir").orNull?.let { systemProperty("pwtoolkit.docs.dir", it) }
     testLogging { events("passed", "failed", "skipped"); exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL; showStandardStreams = true }
