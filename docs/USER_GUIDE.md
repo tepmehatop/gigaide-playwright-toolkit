@@ -23,7 +23,7 @@
 
 1. Скачайте `playwright-toolkit-<версия>.zip` со страницы [Releases](https://github.com/tepmehatop/gigaide-playwright-toolkit/releases). Распаковывать не нужно.
 2. GigaIDE: **Settings → Plugins → ⚙ → Install Plugin from Disk…** → выберите zip → перезапустите IDE.
-3. В проекте с автотестами выполните `npm install`. Нужны `@playwright/test` и, для навигации и подсветки, `typescript@^7` в `devDependencies`.
+3. В проекте с автотестами выполните `npm install`. Нужны `@playwright/test` и, для навигации и подсветки, `typescript` в `devDependencies`: `typescript@^7` (нативный сервер) или TypeScript 5/6 (сервер на Node.js — см. раздел 12).
 4. **Tools → Playwright → Check Environment** покажет, что плагин нашёл:
 
 ```
@@ -31,7 +31,7 @@ Project: ~/projects/autotests
 ✓ Node.js: ~/.nvm/versions/node/v20.20.0/bin/node v20.20.0
 ✓ Playwright: Version 1.64.1
 ✓ Chrome for Testing 156.0.8078.4 (playwright chromium v1248)
-✓ TypeScript 7 (navigation, highlighting): …/node_modules/@typescript/typescript-darwin-x64/lib/tsc
+✓ TypeScript server auto (navigation, highlighting): TypeScript 7 …/node_modules/@typescript/typescript-darwin-x64/lib/tsc
 ✓ vscode-js-debug (debugging): …/GIGA IDE 2026.1.app/Contents/plugins/nodeJS/js-debug/src/dapDebugServer.js
 • playwright-extended-report: installed
 ```
@@ -177,7 +177,7 @@ http://localhost:63342/api/file/{path}:{line}
 |---|---|
 | строке-селекторе в Page Object: `heroSection: "header.hero-section"` | этот селектор |
 | `page.locator('…')`, `page.getByRole('link', { name: 'Find Bugs' }).first()` | этот локатор |
-| `mainPage.selectors.heroSection` в тесте | значение селектора из Page Object (находит TypeScript 7) |
+| `mainPage.selectors.heroSection` в тесте | значение селектора из Page Object (находит TypeScript-сервер) |
 | любое выражение-локатор **на паузе отладчика** | вычисляется в текущем кадре: работают переменные, `this.selectors…` |
 
 Действия (`click`, `fill`…) при этом **никогда не выполняются**: вычисляются только локаторы.
@@ -233,8 +233,9 @@ Tools
 
 | Настройка | По умолчанию |
 |---|---|
-| Пути к Node.js, TypeScript 7, vscode-js-debug | пусто — ищутся автоматически (найденный путь показан под полем) |
-| Go to Declaration через TypeScript 7 | вкл. |
+| Пути к Node.js, TypeScript (tsc/tsgo TS 7 или tsserver.js TS 5/6), vscode-js-debug | пусто — ищутся автоматически (найденный путь показан под полем) |
+| TypeScript server: Auto / Native TypeScript 7 / tsserver.js / typescript-language-server | значение сборки (auto, tsserver или tsls) |
+| Go to Declaration через TypeScript-сервер | вкл. |
 | Semantic highlighting, Rainbow brackets | вкл. |
 | Не заходить в код Playwright при step into | вкл. |
 | Show browser and keep it open between runs | выкл. |
@@ -247,7 +248,8 @@ Tools
 
 | Симптом | Причина и решение |
 |---|---|
-| «Cannot find declaration to go», нет подсветки | Нет TypeScript 7: добавьте `typescript@^7` в `devDependencies` или примите предложение плагина поставить общую копию. Проверка: Tools → Playwright → Check Environment |
+| «Cannot find declaration to go», нет подсветки | Нет TypeScript в `node_modules` проекта: добавьте `typescript` в `devDependencies`. Проверка: Tools → Playwright → Check Environment |
+| Diagnose Highlighting: `Exec failed, error=1 (Операция не позволена)` | Политика ОС запрещает запускать нативный TypeScript 7. Выберите в **Settings → Tools → Playwright Toolkit → TypeScript server** вариант *tsserver.js via Node.js* или *typescript-language-server* (или поставьте сборку `-tsserver`/`-tsls`). Нужен TypeScript 5/6 в `node_modules` проекта |
 | У теста два значка ▶, второй даёт «tsx binary not found» | Второй значок — от плагина NodeJS GigaIDE (запуск через node:test). Плагин его скрывает в Playwright-тестах; перезапустите IDE после установки |
 | В файле теста вечное «Analyzing…» | Ошибка плагина NodeJS GigaIDE (Jest-маркер). Обход включён по умолчанию; перезапустите IDE |
 | Брейкпоинт не срабатывает | Тест упал раньше строки — см. сообщение «was never reached» в консоли Debug |

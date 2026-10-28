@@ -28,13 +28,13 @@ import com.intellij.openapi.vfs.newvfs.events.VFileCreateEvent;
 import com.intellij.openapi.vfs.newvfs.events.VFileDeleteEvent;
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent;
 import com.intellij.openapi.components.Service;
+import dev.pwtoolkit.run.PwResources;
 import dev.pwtoolkit.util.JsFiles;
 import dev.pwtoolkit.util.NodeLocator;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
-import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -47,7 +47,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Keeps one TypeScript 7 language server per project root (directory with tsconfig/jsconfig/package.json)
+ * Keeps one TypeScript language server ({@link TsBackend}) per project root (directory with tsconfig/jsconfig/package.json)
  * and mirrors editor contents into it, so definitions reflect unsaved changes.
  */
 @Service(Service.Level.PROJECT)
@@ -55,6 +55,9 @@ public final class TsLanguageService implements Disposable {
     private static final Logger LOG = Logger.getInstance(TsLanguageService.class);
     private static final String NOTIFICATION_GROUP = "Playwright Toolkit";
     private static final AtomicBoolean INSTALL_SUGGESTED = new AtomicBoolean();
+    /** typescript-language-server 5.1.3 (Apache-2.0), bundled: one file, no dependencies, uses the project's TypeScript. */
+    private static final String TSLS_CLI = "tsls/lib/cli.mjs";
+    private static final String TSLS_PACKAGE = "tsls/package.json";
 
     private final Project project;
     private final Map<Path, Server> servers = new ConcurrentHashMap<>();
@@ -83,22 +86,11 @@ public final class TsLanguageService implements Disposable {
     public @Nullable CompletableFuture<List<Location>> definition(@NotNull VirtualFile file, @NotNull Document document, int offset) {
         Server server = serverFor(file);
         if (server == null) return null;
-        List<Snapshot> snapshots = server.collectChanges(file, document);
         int line = document.getLineNumber(offset);
         int character = offset - document.getLineStartOffset(line);
-
-        Map<String, Object> params = new HashMap<>();
-        params.put("textDocument", Map.of("uri", uri(file)));
-        params.put("position", Map.of("line", line, "character", character));
-        return server.ready
-                .thenCompose(ignored -> {
-                    server.send(snapshots);
-                    return server.client.request("textDocument/definition", params);
-                })
-                .thenApply(TsLanguageService::parseLocations);
+        return server.update(file, document).thenCompose(ignored -> server.backend.definition(file.toNioPath(), line, character));
     }
 
-    /** Starts the server for the file's root ahead of time, so the first Ctrl+Click is fast. */
     /** A semantic token: absolute offsets in the document text that was sent with the request. */
     public record SemanticToken(int start, int length, @NotNull String type, @NotNull Set<String> modifiers) {
     }
@@ -107,79 +99,36 @@ public final class TsLanguageService implements Disposable {
     public @Nullable CompletableFuture<List<SemanticToken>> semanticTokens(@NotNull VirtualFile file, @NotNull Document document) {
         Server server = serverFor(file);
         if (server == null) return null;
-        List<Snapshot> snapshots = server.collectChanges(file, document);
         CharSequence text = document.getImmutableCharSequence();
-        return server.ready
-                .thenCompose(initResult -> {
-                    server.send(snapshots);
-                    return server.client.request("textDocument/semanticTokens/full", Map.of("textDocument", Map.of("uri", uri(file))));
-                })
-                .thenApply(result -> decodeTokens(result, server.ready.join(), text))
+        return server.update(file, document)
+                .thenCompose(ignored -> server.backend.semanticTokens(file.toNioPath(), text))
                 .whenComplete((tokens, error) -> server.lastTokens = error != null
                         ? "error: " + error.getMessage()
                         : tokens.size() + " tokens for " + file.getName());
     }
 
-    /** What happens with the TypeScript 7 server for this file: for Diagnose Highlighting / bug reports. */
+    /** What happens with the TypeScript server for this file: for Diagnose Highlighting / bug reports. */
     public @NotNull List<String> describe(@NotNull VirtualFile file) {
         List<String> lines = new ArrayList<>();
         Path root = findRoot(file);
         if (root == null) {
-            lines.add("TS7 root: none (no tsconfig.json / package.json above " + file.getPath() + ")");
+            lines.add("TS root: none (no tsconfig.json / package.json above " + file.getPath() + ")");
             return lines;
         }
-        lines.add("TS7 root: " + root);
+        lines.add("TS root: " + root);
         Server server = servers.get(root);
         if (server == null) {
-            lines.add("TS7 server: not started" + (startFailures.containsKey(root) ? " - " + startFailures.get(root) : ""));
+            lines.add("TS server: not started" + (startFailures.containsKey(root) ? " - " + startFailures.get(root) : ""));
         } else {
-            String init = !server.ready.isDone() ? "initializing" : server.ready.isCompletedExceptionally() ? "init FAILED" : "initialized";
-            lines.add("TS7 server: " + server.exe + " | " + server.client.state() + " | " + init + " | last: " + server.lastTokens);
-            String stderr = server.client.stderrTail().strip();
-            if (!stderr.isEmpty()) lines.add("TS7 stderr: " + stderr.substring(Math.max(0, stderr.length() - 300)).replace('\n', ' '));
+            CompletableFuture<?> ready = server.backend.ready();
+            String init = !ready.isDone() ? "initializing" : ready.isCompletedExceptionally() ? "init FAILED" : "initialized";
+            lines.add("TS server: " + server.backend.description() + " | " + server.backend.state() + " | " + init + " | last: " + server.lastTokens);
+            if (startFailures.containsKey(root)) lines.add("TS skipped: " + startFailures.get(root));
+            String stderr = server.backend.stderrTail().strip();
+            if (!stderr.isEmpty()) lines.add("TS stderr: " + stderr.substring(Math.max(0, stderr.length() - 300)).replace('\n', ' '));
         }
-        TsServerLocator.explain(root).forEach(line -> lines.add("TS7 search: " + line));
+        TsServerLocator.explain(root).forEach(line -> lines.add("TS search: " + line));
         return lines;
-    }
-
-    private static @NotNull List<SemanticToken> decodeTokens(@Nullable JsonElement result, @NotNull JsonElement initResult, @NotNull CharSequence text) {
-        List<SemanticToken> tokens = new ArrayList<>();
-        if (result == null || !result.isJsonObject() || !result.getAsJsonObject().has("data")) return tokens;
-        JsonObject legend;
-        try {
-            legend = initResult.getAsJsonObject().getAsJsonObject("capabilities")
-                    .getAsJsonObject("semanticTokensProvider").getAsJsonObject("legend");
-        } catch (Exception e) {
-            return tokens;
-        }
-        JsonArray types = legend.getAsJsonArray("tokenTypes");
-        JsonArray modifiers = legend.getAsJsonArray("tokenModifiers");
-
-        List<Integer> lineStarts = new ArrayList<>();
-        lineStarts.add(0);
-        for (int i = 0; i < text.length(); i++) {
-            if (text.charAt(i) == '\n') lineStarts.add(i + 1);
-        }
-        JsonArray data = result.getAsJsonObject().getAsJsonArray("data");
-        int line = 0;
-        int character = 0;
-        for (int i = 0; i + 4 < data.size(); i += 5) {
-            int deltaLine = data.get(i).getAsInt();
-            line += deltaLine;
-            character = deltaLine == 0 ? character + data.get(i + 1).getAsInt() : data.get(i + 1).getAsInt();
-            int length = data.get(i + 2).getAsInt();
-            int typeIndex = data.get(i + 3).getAsInt();
-            int modifierBits = data.get(i + 4).getAsInt();
-            if (line >= lineStarts.size() || typeIndex >= types.size()) continue;
-            int start = lineStarts.get(line) + character;
-            if (start + length > text.length()) continue;
-            Set<String> mods = new java.util.HashSet<>();
-            for (int bit = 0; bit < modifiers.size(); bit++) {
-                if ((modifierBits & (1 << bit)) != 0) mods.add(modifiers.get(bit).getAsString());
-            }
-            tokens.add(new SemanticToken(start, length, types.get(typeIndex).getAsString(), mods));
-        }
-        return tokens;
     }
 
     public void warmUp(@NotNull VirtualFile file) {
@@ -187,8 +136,7 @@ public final class TsLanguageService implements Disposable {
         if (server == null) return;
         Document document = ApplicationManager.getApplication().runReadAction((Computable<Document>) () -> FileDocumentManager.getInstance().getDocument(file));
         if (document == null) return;
-        List<Snapshot> snapshots = ApplicationManager.getApplication().runReadAction((Computable<List<Snapshot>>) () -> server.collectChanges(file, document));
-        server.ready.thenRun(() -> server.send(snapshots));
+        ApplicationManager.getApplication().runReadAction((Computable<CompletableFuture<?>>) () -> server.update(file, document));
     }
 
     public void restartAll() {
@@ -205,25 +153,81 @@ public final class TsLanguageService implements Disposable {
         Path root = findRoot(file);
         if (root == null) return null;
         Server existing = servers.get(root);
-        if (existing != null && existing.client.isAlive()) return existing;
+        if (existing != null && existing.backend.isAlive()) return existing;
         synchronized (servers) {
             existing = servers.get(root);
-            if (existing != null && existing.client.isAlive()) return existing;
+            if (existing != null && existing.backend.isAlive()) return existing;
+            if (existing != null) existing.stop();
+            TsBackend backend = startBackend(root);
+            if (backend == null) {
+                servers.remove(root);
+                return null;
+            }
+            Server server = new Server(root, backend);
+            servers.put(root, server);
+            return server;
+        }
+    }
+
+    /**
+     * Starts the configured server; in auto mode the next one when a server is missing or cannot be started
+     * (e.g. native binaries forbidden by a security policy: "Exec failed, error=1, Operation not permitted").
+     */
+    private @Nullable TsBackend startBackend(@NotNull Path root) {
+        TsServerLocator.Backend mode = TsServerLocator.backend();
+        boolean auto = mode == TsServerLocator.Backend.AUTO;
+        List<String> problems = new ArrayList<>();
+        if (auto || mode == TsServerLocator.Backend.NATIVE) {
             Path exe = TsServerLocator.find(root);
             if (exe == null) {
-                suggestInstall();
-                return null;
-            }
-            try {
-                Server server = new Server(root, exe);
-                servers.put(root, server);
-                return server;
-            } catch (Exception e) {
-                LOG.warn("Cannot start TypeScript language server " + exe, e);
-                startFailures.put(root, exe + ": " + e.getMessage());
-                return null;
+                problems.add("native: no TypeScript 7");
+            } else {
+                try {
+                    return remember(root, problems, LspTsBackend.nativeServer(root, exe));
+                } catch (Exception e) {
+                    LOG.warn("Cannot start TypeScript language server " + exe, e);
+                    problems.add("native: " + exe + ": " + e.getMessage());
+                }
             }
         }
+        if (auto || mode == TsServerLocator.Backend.TSSERVER || mode == TsServerLocator.Backend.TSLS) {
+            TsServerLocator.Tsserver tsserver = TsServerLocator.findTsserver(root);
+            String node = NodeLocator.findNode(null);
+            if (tsserver == null) {
+                problems.add("node: no TypeScript 5/6 (lib/tsserver.js) in node_modules");
+            } else if (node == null) {
+                problems.add("node: Node.js not found");
+            } else {
+                if (auto || mode == TsServerLocator.Backend.TSSERVER) {
+                    try {
+                        return remember(root, problems, new TsserverBackend(root, node, tsserver.path(), tsserver.version()));
+                    } catch (Exception e) {
+                        LOG.warn("Cannot start " + tsserver.path(), e);
+                        problems.add("tsserver: " + node + " " + tsserver.path() + ": " + e.getMessage());
+                    }
+                }
+                if (auto || mode == TsServerLocator.Backend.TSLS) {
+                    try {
+                        Path cli = PwResources.install(TSLS_CLI);
+                        PwResources.install(TSLS_PACKAGE);
+                        return remember(root, problems, LspTsBackend.typescriptLanguageServer(root, node, cli, tsserver));
+                    } catch (Exception e) {
+                        LOG.warn("Cannot start typescript-language-server", e);
+                        problems.add("tsls: " + node + ": " + e.getMessage());
+                    }
+                }
+            }
+        }
+        startFailures.put(root, "mode " + mode.name().toLowerCase() + ": " + String.join("; ", problems));
+        if (auto || mode == TsServerLocator.Backend.NATIVE) suggestInstall();
+        return null;
+    }
+
+    private @NotNull TsBackend remember(@NotNull Path root, @NotNull List<String> problems, @NotNull TsBackend backend) {
+        if (problems.isEmpty()) startFailures.remove(root);
+        else startFailures.put(root, String.join("; ", problems));
+        LOG.info("[pwtoolkit] TypeScript server for " + root + ": " + backend.description());
+        return backend;
     }
 
     /** Closest directory with tsconfig.json/jsconfig.json, otherwise closest package.json. */
@@ -242,18 +246,17 @@ public final class TsLanguageService implements Disposable {
     private void onFilesChanged(@NotNull List<? extends VFileEvent> events) {
         if (servers.isEmpty()) return;
         for (Server server : servers.values()) {
-            List<Map<String, Object>> changes = new ArrayList<>();
+            List<Path> files = new ArrayList<>();
+            List<Integer> types = new ArrayList<>();
             for (VFileEvent event : events) {
                 String path = event.getPath();
                 if (!path.startsWith(server.root.toString())) continue;
                 if (!JsFiles.isScriptName(path) && !path.endsWith(".json")) continue;
-                if (event.isFromSave() && server.opened.containsKey(uri(path))) continue;
-                int type = event instanceof VFileCreateEvent ? 1 : event instanceof VFileDeleteEvent ? 3 : 2;
-                changes.add(Map.of("uri", uri(path), "type", type));
+                if (event.isFromSave() && server.opened.containsKey(path)) continue;
+                files.add(Path.of(path));
+                types.add(event instanceof VFileCreateEvent ? 1 : event instanceof VFileDeleteEvent ? 3 : 2);
             }
-            if (!changes.isEmpty()) {
-                server.ready.thenRun(() -> server.client.notify("workspace/didChangeWatchedFiles", Map.of("changes", changes)));
-            }
+            if (!files.isEmpty()) server.backend.ready().thenRun(() -> server.backend.filesChanged(files, types));
         }
     }
 
@@ -332,133 +335,68 @@ public final class TsLanguageService implements Disposable {
                 .notify(project);
     }
 
-    private static @NotNull List<Location> parseLocations(@Nullable JsonElement result) {
-        List<Location> locations = new ArrayList<>();
-        if (result == null || result.isJsonNull()) return locations;
-        JsonArray array;
-        if (result.isJsonArray()) {
-            array = result.getAsJsonArray();
-        } else {
-            array = new JsonArray();
-            array.add(result);
-        }
-        for (JsonElement element : array) {
-            JsonObject location = element.getAsJsonObject();
-            String uri = location.has("targetUri") ? location.get("targetUri").getAsString() : location.get("uri").getAsString();
-            JsonObject range = location.has("targetSelectionRange")
-                    ? location.getAsJsonObject("targetSelectionRange")
-                    : location.getAsJsonObject("range");
-            JsonObject start = range.getAsJsonObject("start");
-            try {
-                locations.add(new Location(Path.of(new URI(uri)), start.get("line").getAsInt(), start.get("character").getAsInt()));
-            } catch (Exception e) {
-                LOG.debug("Unsupported location " + uri, e);
-            }
-        }
-        return locations;
-    }
-
-    static @NotNull String uri(@NotNull VirtualFile file) {
-        return uri(file.getPath());
-    }
-
-    static @NotNull String uri(@NotNull String path) {
-        return Path.of(path).toUri().toString();
-    }
-
-    private record Snapshot(@NotNull String uri, @NotNull String languageId, @Nullable String text, int version, boolean open) {
-    }
-
     private final class Server {
         final Path root;
-        final Path exe;
+        final TsBackend backend;
         volatile String lastTokens = "no request yet";
-        final LspClient client;
-        final CompletableFuture<JsonElement> ready;
-        /** uri -> document modification stamp last sent to the server. */
+        /** path -> document modification stamp last sent to the server. */
         final Map<String, Long> opened = new ConcurrentHashMap<>();
         final Map<String, Integer> versions = new ConcurrentHashMap<>();
+        /** Document updates are sent strictly in order, and each request only after its own update. */
+        private CompletableFuture<?> synced;
 
-        Server(@NotNull Path root, @NotNull Path exe) throws Exception {
+        Server(@NotNull Path root, @NotNull TsBackend backend) {
             this.root = root;
-            this.exe = exe;
-            this.client = LspClient.start(List.of(exe.toString(), "--lsp", "--stdio"), root.toFile());
-            String rootUri = root.toUri().toString();
-            Map<String, Object> capabilities = Map.of(
-                    "textDocument", Map.of("definition", Map.of("linkSupport", true),
-                            "synchronization", Map.of("didSave", false, "dynamicRegistration", false),
-                            "semanticTokens", Map.of("requests", Map.of("full", true), "formats", List.of("relative"),
-                                    "tokenTypes", List.of("namespace", "class", "enum", "interface", "typeParameter", "type",
-                                            "parameter", "variable", "property", "enumMember", "function", "method"),
-                                    "tokenModifiers", List.of("declaration", "readonly", "static", "async", "defaultLibrary", "local"))),
-                    "workspace", Map.of("didChangeWatchedFiles", Map.of("dynamicRegistration", true),
-                            "workspaceFolders", true, "configuration", true));
-            Map<String, Object> params = new HashMap<>();
-            params.put("processId", ProcessHandle.current().pid());
-            params.put("rootUri", rootUri);
-            params.put("capabilities", capabilities);
-            params.put("workspaceFolders", List.of(Map.of("uri", rootUri, "name", root.getFileName().toString())));
-            this.ready = client.request("initialize", params).thenApply(result -> {
-                client.notify("initialized", Map.of());
-                return result;
-            });
+            this.backend = backend;
+            this.synced = backend.ready();
+        }
+
+        /** Must be called inside a read action. Completes once the server has seen the current editor state. */
+        synchronized @NotNull CompletableFuture<?> update(@NotNull VirtualFile current, @NotNull Document currentDocument) {
+            List<TsBackend.DocumentChange> changes = collectChanges(current, currentDocument);
+            if (!changes.isEmpty()) synced = synced.thenRun(() -> backend.sync(changes));
+            return synced;
         }
 
         /**
          * Computes what has to be sent so that the server sees the current editor state:
          * the requested document plus every document we opened earlier.
          */
-        synchronized @NotNull List<Snapshot> collectChanges(@NotNull VirtualFile current, @NotNull Document currentDocument) {
+        private @NotNull List<TsBackend.DocumentChange> collectChanges(@NotNull VirtualFile current, @NotNull Document currentDocument) {
             FileDocumentManager fdm = FileDocumentManager.getInstance();
-            List<Snapshot> result = new ArrayList<>();
+            List<TsBackend.DocumentChange> result = new ArrayList<>();
             Map<String, VirtualFile> candidates = new HashMap<>();
-            candidates.put(uri(current), current);
-            for (String uri : opened.keySet()) {
-                VirtualFile vf = LocalFileSystem.getInstance().findFileByNioFile(Path.of(URI.create(uri)));
-                candidates.putIfAbsent(uri, vf);
+            candidates.put(current.getPath(), current);
+            for (String path : opened.keySet()) {
+                candidates.putIfAbsent(path, LocalFileSystem.getInstance().findFileByNioFile(Path.of(path)));
             }
             for (Document unsaved : fdm.getUnsavedDocuments()) {
                 VirtualFile vf = fdm.getFile(unsaved);
-                if (vf != null && JsFiles.isScript(vf) && vf.getPath().startsWith(root.toString())) candidates.putIfAbsent(uri(vf), vf);
+                if (vf != null && JsFiles.isScript(vf) && vf.getPath().startsWith(root.toString())) candidates.putIfAbsent(vf.getPath(), vf);
             }
             for (Map.Entry<String, VirtualFile> entry : candidates.entrySet()) {
-                String uri = entry.getKey();
+                String path = entry.getKey();
                 VirtualFile vf = entry.getValue();
                 Document document = vf == null ? null : vf.equals(current) ? currentDocument : fdm.getCachedDocument(vf);
-                Long sentStamp = opened.get(uri);
+                Long sentStamp = opened.get(path);
                 if (document == null) {
                     if (sentStamp != null) {
-                        opened.remove(uri);
-                        result.add(new Snapshot(uri, "", null, 0, false));
+                        opened.remove(path);
+                        result.add(new TsBackend.DocumentChange(Path.of(path), "", null, 0, false));
                     }
                     continue;
                 }
                 long stamp = document.getModificationStamp();
                 if (sentStamp != null && sentStamp == stamp) continue;
-                opened.put(uri, stamp);
-                int version = versions.merge(uri, 1, Integer::sum);
-                result.add(new Snapshot(uri, JsFiles.languageId(vf.getName()), document.getText(), version, sentStamp == null));
+                opened.put(path, stamp);
+                int version = versions.merge(path, 1, Integer::sum);
+                result.add(new TsBackend.DocumentChange(Path.of(path), JsFiles.languageId(vf.getName()), document.getText(), version, sentStamp == null));
             }
             return result;
         }
 
-        synchronized void send(@NotNull List<Snapshot> snapshots) {
-            for (Snapshot s : snapshots) {
-                if (s.text == null) {
-                    client.notify("textDocument/didClose", Map.of("textDocument", Map.of("uri", s.uri)));
-                } else if (s.open) {
-                    client.notify("textDocument/didOpen", Map.of("textDocument",
-                            Map.of("uri", s.uri, "languageId", s.languageId, "version", s.version, "text", s.text)));
-                } else {
-                    client.notify("textDocument/didChange", Map.of(
-                            "textDocument", Map.of("uri", s.uri, "version", s.version),
-                            "contentChanges", List.of(Map.of("text", s.text))));
-                }
-            }
-        }
-
         void stop() {
-            client.shutdown();
+            backend.shutdown();
         }
     }
 }

@@ -3,6 +3,7 @@ package dev.pwtoolkit.settings;
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory;
 import com.intellij.openapi.options.SearchableConfigurable;
 import com.intellij.openapi.project.ProjectManager;
+import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.TextFieldWithBrowseButton;
 import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBLabel;
@@ -10,6 +11,7 @@ import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.UIUtil;
 import dev.pwtoolkit.debug.JsDebugLocator;
 import dev.pwtoolkit.nav.TsLanguageService;
+import dev.pwtoolkit.nav.TsServerLocator;
 import dev.pwtoolkit.util.NodeLocator;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -24,6 +26,8 @@ import java.util.Objects;
 public final class PwConfigurable implements SearchableConfigurable {
     private TextFieldWithBrowseButton nodePath;
     private TextFieldWithBrowseButton tsServerPath;
+    /** Index 0: the default of this build, then {@link TsServerLocator.Backend} values. */
+    private ComboBox<String> tsBackend;
     private TextFieldWithBrowseButton jsDebugPath;
     private JBCheckBox navigationEnabled;
     private JSpinner navigationTimeout;
@@ -52,13 +56,16 @@ public final class PwConfigurable implements SearchableConfigurable {
         nodePath = new TextFieldWithBrowseButton();
         nodePath.addBrowseFolderListener(null, FileChooserDescriptorFactory.createSingleFileNoJarsDescriptor().withTitle("Node.js Interpreter"));
         tsServerPath = new TextFieldWithBrowseButton();
-        tsServerPath.addBrowseFolderListener(null, FileChooserDescriptorFactory.createSingleFileNoJarsDescriptor().withTitle("TypeScript 7 Executable"));
+        tsServerPath.addBrowseFolderListener(null, FileChooserDescriptorFactory.createSingleFileNoJarsDescriptor().withTitle("TypeScript Server"));
+        tsBackend = new ComboBox<>();
+        tsBackend.addItem("Default (" + TsServerLocator.defaultBackend() + ")");
+        for (TsServerLocator.Backend backend : TsServerLocator.Backend.values()) tsBackend.addItem(backend.title);
         jsDebugPath = new TextFieldWithBrowseButton();
         jsDebugPath.addBrowseFolderListener(null, FileChooserDescriptorFactory.createSingleFolderDescriptor().withTitle("vscode-js-debug Folder"));
-        navigationEnabled = new JBCheckBox("Resolve Go to Declaration with the TypeScript 7 language server");
+        navigationEnabled = new JBCheckBox("Resolve Go to Declaration with the TypeScript language server");
         navigationTimeout = new JSpinner(new SpinnerNumberModel(3000, 200, 60000, 100));
         skipInternals = new JBCheckBox("Do not step into Playwright internals (node_modules/playwright*)");
-        semanticHighlighting = new JBCheckBox("Semantic highlighting (fixtures, Page Object fields and methods) from TypeScript 7");
+        semanticHighlighting = new JBCheckBox("Semantic highlighting (fixtures, Page Object fields and methods) from TypeScript");
         rainbowBrackets = new JBCheckBox("Rainbow brackets in TS/JS files (color by nesting depth)");
         semanticHighlighting.setToolTipText("Unique colors for parameters and local variables: Settings | Editor | Color Scheme | Language Defaults | Semantic highlighting");
         showBrowser = new JBCheckBox("Show the browser while debugging (--headed)");
@@ -80,8 +87,11 @@ public final class PwConfigurable implements SearchableConfigurable {
                 .addComponentToRightColumn(hint("Detected: " + Objects.requireNonNullElse(node, "not found")))
                 .addSeparator()
                 .addComponent(navigationEnabled)
-                .addLabeledComponent("TypeScript 7 executable (tsc/tsgo):", tsServerPath)
-                .addComponentToRightColumn(hint("Default: node_modules/@typescript/typescript-<os>-<arch>/lib/tsc of the project"))
+                .addLabeledComponent("TypeScript server:", tsBackend)
+                .addComponentToRightColumn(hint("<html>Auto: native TypeScript 7, then tsserver.js, then typescript-language-server.<br>"
+                        + "Node.js servers: TypeScript 5/6 of the project, when native binaries are forbidden</html>"))
+                .addLabeledComponent("TypeScript 7 tsc/tsgo or tsserver.js:", tsServerPath)
+                .addComponentToRightColumn(hint("Default: found in node_modules of the project"))
                 .addLabeledComponent("Navigation timeout, ms:", navigationTimeout)
                 .addComponent(semanticHighlighting)
                 .addComponent(rainbowBrackets)
@@ -100,6 +110,11 @@ public final class PwConfigurable implements SearchableConfigurable {
                 .getPanel();
     }
 
+    private @NotNull String selectedBackend() {
+        int index = tsBackend.getSelectedIndex();
+        return index <= 0 ? "" : TsServerLocator.Backend.values()[index - 1].name().toLowerCase();
+    }
+
     private static JBLabel hint(String text) {
         JBLabel label = new JBLabel(text);
         label.setFontColor(UIUtil.FontColor.BRIGHTER);
@@ -111,6 +126,7 @@ public final class PwConfigurable implements SearchableConfigurable {
         PwSettings.StateBean s = PwSettings.getInstance().getState();
         return !nodePath.getText().trim().equals(s.nodePath)
                 || !tsServerPath.getText().trim().equals(s.tsServerPath)
+                || !selectedBackend().equals(s.tsBackend)
                 || !jsDebugPath.getText().trim().equals(s.jsDebugPath)
                 || navigationEnabled.isSelected() != s.navigationEnabled
                 || (Integer) navigationTimeout.getValue() != s.navigationTimeoutMs
@@ -128,7 +144,9 @@ public final class PwConfigurable implements SearchableConfigurable {
     @Override
     public void apply() {
         PwSettings.StateBean s = PwSettings.getInstance().getState();
-        boolean serverChanged = !tsServerPath.getText().trim().equals(s.tsServerPath) || navigationEnabled.isSelected() != s.navigationEnabled;
+        boolean serverChanged = !tsServerPath.getText().trim().equals(s.tsServerPath) || navigationEnabled.isSelected() != s.navigationEnabled
+                || !selectedBackend().equals(s.tsBackend);
+        s.tsBackend = selectedBackend();
         s.nodePath = nodePath.getText().trim();
         s.tsServerPath = tsServerPath.getText().trim();
         s.jsDebugPath = jsDebugPath.getText().trim();
@@ -160,6 +178,11 @@ public final class PwConfigurable implements SearchableConfigurable {
         PwSettings.StateBean s = PwSettings.getInstance().getState();
         nodePath.setText(s.nodePath);
         tsServerPath.setText(s.tsServerPath);
+        int index = 0;
+        for (TsServerLocator.Backend backend : TsServerLocator.Backend.values()) {
+            if (backend.name().equalsIgnoreCase(s.tsBackend)) index = backend.ordinal() + 1;
+        }
+        tsBackend.setSelectedIndex(index);
         jsDebugPath.setText(s.jsDebugPath);
         navigationEnabled.setSelected(s.navigationEnabled);
         navigationTimeout.setValue(s.navigationTimeoutMs);

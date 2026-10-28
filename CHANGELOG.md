@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.4.0
+
+- **TypeScript-сервер на Node.js** — для машин, где политика безопасности запрещает запускать нативные бинарники (`Exec failed, error=1 (Операция не позволена)`, SberOS). Навигация и подсветка работают на TypeScript 5/6 из `node_modules` проекта, ставить TypeScript 7 не нужно.
+- **Settings → Tools → Playwright Toolkit → TypeScript server**:
+  - **Auto** — нативный TypeScript 7; если его нет или он не запускается — `tsserver.js`, затем typescript-language-server;
+  - **Native TypeScript 7**;
+  - **tsserver.js via Node.js** — `node_modules/typescript/lib/tsserver.js` проекта, протокол как у VS Code;
+  - **typescript-language-server** — встроен в плагин (5.1.3, Apache-2.0, один файл без зависимостей), использует TypeScript проекта; нужен Node.js 20+.
+- Три сборки отличаются только значением по умолчанию: `playwright-toolkit-1.4.0.zip` (auto), `-1.4.0-tsserver.zip`, `-1.4.0-tsls.zip`. В любой сборке сервер можно переключить в настройках.
+- Diagnose Highlighting и Check Environment показывают выбранный сервер, почему пропущены другие (`TS skipped: native: … Exec failed`) и версию TypeScript.
+- Исправлена гонка: запрос подсветки мог уйти в сервер раньше, чем текст файла.
+
 ## 1.3.1
 
 - Linux: если бинарник TypeScript 7 после установки из корпоративного реестра без права на запуск, плагин выставляет его сам.

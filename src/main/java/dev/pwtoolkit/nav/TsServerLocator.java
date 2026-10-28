@@ -14,16 +14,65 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
- * Locates the native TypeScript 7 language server binary ({@code tsc --lsp --stdio}).
- * Order: explicit setting, project node_modules (walking up), plugin-managed install.
+ * Locates the TypeScript language servers:
+ * <ul>
+ *   <li>the native TypeScript 7 binary ({@code tsc --lsp --stdio}): explicit setting, project node_modules
+ *   (walking up), plugin-managed install;</li>
+ *   <li>{@code lib/tsserver.js} of TypeScript 5/6 (run by Node.js, also used by typescript-language-server):
+ *   explicit setting ending with .js, project node_modules (walking up).</li>
+ * </ul>
  */
 public final class TsServerLocator {
+    /** Which server to use: try them in order (auto), or only one of them. */
+    public enum Backend {
+        AUTO("Auto"),
+        NATIVE("Native TypeScript 7"),
+        TSSERVER("tsserver.js (Node.js)"),
+        TSLS("typescript-language-server (Node.js)");
+
+        public final String title;
+
+        Backend(String title) {
+            this.title = title;
+        }
+
+        @Override
+        public String toString() {
+            return title;
+        }
+    }
+
+    /** A TypeScript 5/6 {@code tsserver.js} and its package version. */
+    public record Tsserver(@NotNull Path path, @NotNull String version) {
+    }
+
     private TsServerLocator() {
+    }
+
+    /** The setting, or the default this plugin build was made with (see build.gradle.kts, -PtsBackend). */
+    public static @NotNull Backend backend() {
+        String value = PwSettings.getInstance().getState().tsBackend;
+        if (StringUtil.isEmptyOrSpaces(value)) value = defaultBackend();
+        try {
+            return Backend.valueOf(StringUtil.toUpperCase(value.trim()));
+        } catch (IllegalArgumentException e) {
+            return Backend.AUTO;
+        }
+    }
+
+    public static @NotNull String defaultBackend() {
+        try (java.io.InputStream in = TsServerLocator.class.getResourceAsStream("/pwtoolkit/build.properties")) {
+            java.util.Properties properties = new java.util.Properties();
+            if (in != null) properties.load(in);
+            return properties.getProperty("tsBackend", "auto");
+        } catch (java.io.IOException e) {
+            return "auto";
+        }
     }
 
     public static @Nullable Path find(@NotNull Path root) {
         String configured = PwSettings.getInstance().getState().tsServerPath;
-        if (!StringUtil.isEmptyOrSpaces(configured) && Files.isRegularFile(Path.of(configured))) {
+        if (!StringUtil.isEmptyOrSpaces(configured) && !configured.endsWith(".js") && Files.isRegularFile(Path.of(configured))) {
             return Path.of(configured);
         }
         for (Path dir = root; dir != null; dir = dir.getParent()) {
@@ -31,6 +80,24 @@ public final class TsServerLocator {
             if (found != null) return found;
         }
         return findInNodeModules(managedInstallDir().resolve("node_modules"));
+    }
+
+    /** TypeScript before 7 ships lib/tsserver.js: pure JavaScript, runs wherever Node.js runs. */
+    public static @Nullable Tsserver findTsserver(@NotNull Path root) {
+        String configured = PwSettings.getInstance().getState().tsServerPath;
+        if (!StringUtil.isEmptyOrSpaces(configured) && configured.endsWith(".js") && Files.isRegularFile(Path.of(configured))) {
+            Path js = Path.of(configured);
+            Path packageJson = js.getParent() == null || js.getParent().getParent() == null ? js : js.getParent().getParent().resolve("package.json");
+            return new Tsserver(js, version(packageJson));
+        }
+        for (Path dir = root; dir != null; dir = dir.getParent()) {
+            Path typescript = dir.resolve("node_modules").resolve("typescript");
+            Path js = typescript.resolve("lib").resolve("tsserver.js");
+            if (Files.isRegularFile(js) && majorVersion(typescript.resolve("package.json")) < 7) {
+                return new Tsserver(js, version(typescript.resolve("package.json")));
+            }
+        }
+        return null;
     }
 
     /** Where "Install TypeScript 7" puts its own copy (outside of any user project). */
@@ -91,13 +158,16 @@ public final class TsServerLocator {
             String version = version(packageJson);
             Path binary = hasPreview ? previewBinary(nodeModules) : typescriptBinary(nodeModules);
             String state;
-            if (!hasPreview && majorVersion(packageJson) < 7) state = "typescript " + version + " (needs 7+)";
+            if (!hasPreview && majorVersion(packageJson) < 7) {
+                state = "typescript " + version + (Files.isRegularFile(nodeModules.resolve("typescript/lib/tsserver.js")) ? ", tsserver.js ok" : ", NO tsserver.js");
+            }
             else if (!Files.isRegularFile(binary)) state = "typescript " + version + ", MISSING " + nodeModules.relativize(binary)
                     + " (optional dependency not installed: npm install @typescript/typescript-" + platform() + "@" + version + ")";
             else state = "typescript " + version + ", " + binary.getFileName() + (Files.isExecutable(binary) ? " ok" : " NOT EXECUTABLE");
             lines.add(nodeModules + ": " + state);
         }
         if (lines.isEmpty()) lines.add("no typescript in node_modules above " + root + " nor in " + managedInstallDir());
+        lines.add("backend: " + backend().name().toLowerCase() + " (build default: " + defaultBackend() + ")");
         lines.add("platform: " + platform() + " (" + System.getProperty("os.name") + " " + System.getProperty("os.version") + ")");
         return lines;
     }

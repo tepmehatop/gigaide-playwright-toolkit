@@ -99,7 +99,9 @@ public final class HighlightingDiagnosticsAction extends AnAction {
         if (file != null) lines.addAll(TsLanguageService.getInstance(project).describe(file));
         if (file != null) {
             java.nio.file.Path root = TsLanguageService.findRoot(file);
-            java.nio.file.Path exe = root == null ? null : TsServerLocator.find(root);
+            var mode = TsServerLocator.backend();
+            boolean nativeUsed = mode == TsServerLocator.Backend.AUTO || mode == TsServerLocator.Backend.NATIVE;
+            java.nio.file.Path exe = root == null || !nativeUsed ? null : TsServerLocator.find(root);
             if (exe != null) lines.add("TS7 run: " + runVersion(exe));
         }
         lines.add("node: " + dev.pwtoolkit.util.NodeLocator.findNode(null));

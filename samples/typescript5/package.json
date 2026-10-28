@@ -1,0 +1,8 @@
+{
+  "name": "typescript5",
+  "private": true,
+  "description": "TypeScript 5 (tsserver.js) for the tests of the Node.js language servers",
+  "devDependencies": {
+    "typescript": "5.8.2"
+  }
+}
