@@ -172,6 +172,7 @@ public final class PwToolsActions {
         }
         Path ts = TsServerLocator.find(workDir.toPath());
         lines.add(mark(ts != null) + " TypeScript 7 (navigation, highlighting): " + (ts == null ? "not found, add typescript@^7 to devDependencies" : ts));
+        TsServerLocator.explain(workDir.toPath()).forEach(line -> lines.add("    " + line));
         Path jsDebug = JsDebugLocator.findServerScript();
         lines.add(mark(jsDebug != null) + " vscode-js-debug (debugging): " + (jsDebug == null ? "not found" : jsDebug));
         // optional: without it the standard HTML report is opened

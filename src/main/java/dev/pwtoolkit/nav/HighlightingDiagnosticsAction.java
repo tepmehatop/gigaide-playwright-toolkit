@@ -54,35 +54,70 @@ public final class HighlightingDiagnosticsAction extends AnAction {
         int lineStart = document.getLineStartOffset(line);
         int lineEnd = document.getLineEndOffset(line);
         EditorColorsScheme scheme = editor.getColorsScheme();
-        StringBuilder out = new StringBuilder();
-        out.append("[pwtoolkit] highlighting diagnostics, line ").append(line + 1).append(": ")
-                .append(document.getText().substring(lineStart, lineEnd).strip()).append('\n');
-        out.append("scheme=").append(scheme.getName())
-                .append(" defaultFg=").append(scheme.getDefaultForeground())
-                .append(" settings.semantic=").append(PwSettings.getInstance().getState().semanticHighlighting)
-                .append(" settings.rainbowBrackets=").append(PwSettings.getInstance().getState().rainbowBrackets).append('\n');
+        com.intellij.openapi.vfs.VirtualFile file = com.intellij.openapi.fileEditor.FileDocumentManager.getInstance().getFile(document);
+        String lineText = document.getText().substring(lineStart, lineEnd).strip();
+
+        // details: every highlighter on the caret line (ours and the IDE's)
+        StringBuilder details = new StringBuilder();
         for (String id : new String[]{"TypeScript", "JavaScript"}) {
             Language language = Language.findLanguageByID(id);
-            out.append("rainbow[").append(id).append("]=")
+            details.append("rainbow[").append(id).append("]=")
                     .append(language == null ? "no language" : RainbowHighlighter.isRainbowEnabledWithInheritance(scheme, language)).append(' ');
         }
-        out.append("rainbow[default]=").append(RainbowHighlighter.isRainbowEnabled(scheme, null)).append('\n');
+        details.append('\n');
         List<RangeHighlighter> ours = TsSemanticHighlighter.appliedHighlighters(document);
-        out.append("ours=").append(ours == null ? "none" : ours.size()).append('\n');
-
         List<String[]> rows = new ArrayList<>();
         collect("doc", DocumentMarkupModel.forDocument(document, project, false), lineStart, lineEnd, scheme, ours, document, rows);
         collect("editor", editor.getMarkupModel(), lineStart, lineEnd, scheme, ours, document, rows);
         rows.sort(Comparator.comparingInt(r -> Integer.parseInt(r[0])));
-        for (String[] row : rows) out.append(row[1]).append('\n');
+        for (String[] row : rows) details.append(row[1]).append('\n');
 
-        String report = out.toString();
-        LOG.info(report);
-        CopyPasteManager.getInstance().setContents(new StringSelection(report));
-        NotificationGroupManager.getInstance().getNotificationGroup("Playwright Toolkit")
-                .createNotification("Highlighting diagnostics copied to the clipboard", "Paste it into the chat (it is also in idea.log).",
-                        NotificationType.INFORMATION)
-                .notify(project);
+        com.intellij.openapi.application.ApplicationManager.getApplication().executeOnPooledThread(() -> {
+            List<String> summary = summary(project, file, document, line + 1, lineText, scheme);
+            String report = "[pwtoolkit] highlighting diagnostics\nSUMMARY\n" + String.join("\n", summary) + "\nDETAILS\n" + details;
+            LOG.info(report);
+            com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater(() -> {
+                CopyPasteManager.getInstance().setContents(new StringSelection(report));
+                // shown in a dialog too: in closed networks the report is retyped by hand, the summary is enough
+                com.intellij.openapi.ui.Messages.showInfoMessage(project, String.join("\n", summary)
+                        + "\n\n(The full report is in the clipboard and in idea.log.)", "Playwright Toolkit: Highlighting Diagnostics");
+            });
+        });
+    }
+
+    /** Short numbered lines, meant to be retyped by hand from a closed network. */
+    static List<String> summary(Project project, com.intellij.openapi.vfs.VirtualFile file, Document document, int line,
+                                String lineText, EditorColorsScheme scheme) {
+        List<String> lines = new ArrayList<>();
+        var app = com.intellij.openapi.application.ApplicationInfo.getInstance();
+        var plugin = com.intellij.ide.plugins.PluginManagerCore.getPlugin(com.intellij.openapi.extensions.PluginId.getId("dev.pwtoolkit.gigaide"));
+        lines.add("IDE: " + app.getFullApplicationName() + " " + app.getBuild() + " | " + System.getProperty("os.name") + " "
+                + System.getProperty("os.version") + " " + System.getProperty("os.arch") + " | plugin " + (plugin == null ? "?" : plugin.getVersion()));
+        lines.add("file: " + (file == null ? "?" : file.getName()) + " line " + line + ": " + lineText);
+        String stats = TsSemanticHighlighter.stats(document);
+        lines.add("highlight: " + (stats == null ? "not run for this file yet" : stats));
+        if (file != null) lines.addAll(TsLanguageService.getInstance(project).describe(file));
+        if (file != null) {
+            java.nio.file.Path root = TsLanguageService.findRoot(file);
+            java.nio.file.Path exe = root == null ? null : TsServerLocator.find(root);
+            if (exe != null) lines.add("TS7 run: " + runVersion(exe));
+        }
+        lines.add("node: " + dev.pwtoolkit.util.NodeLocator.findNode(null));
+        lines.add("scheme: " + scheme.getName() + " | semantic=" + PwSettings.getInstance().getState().semanticHighlighting
+                + " brackets=" + PwSettings.getInstance().getState().rainbowBrackets);
+        return lines;
+    }
+
+    /** {@code <tsc> --version}: shows "Permission denied", missing libraries, wrong architecture... */
+    private static String runVersion(java.nio.file.Path exe) {
+        try {
+            var output = new com.intellij.execution.process.CapturingProcessHandler(
+                    new com.intellij.execution.configurations.GeneralCommandLine(exe.toString(), "--version")).runProcess(15_000);
+            String text = (output.getStdout() + " " + output.getStderr()).strip().replace('\n', ' ');
+            return "exit " + output.getExitCode() + (output.isTimeout() ? " (timeout)" : "") + ": " + text.substring(0, Math.min(200, text.length()));
+        } catch (Exception e) {
+            return "cannot start: " + e.getMessage();
+        }
     }
 
     private static void collect(String model, MarkupModel markup, int start, int end, EditorColorsScheme scheme,

@@ -58,6 +58,8 @@ public final class TsLanguageService implements Disposable {
 
     private final Project project;
     private final Map<Path, Server> servers = new ConcurrentHashMap<>();
+    /** Why a server could not be started, per root (diagnostics). */
+    private final Map<Path, String> startFailures = new ConcurrentHashMap<>();
 
     public TsLanguageService(@NotNull Project project) {
         this.project = project;
@@ -112,7 +114,32 @@ public final class TsLanguageService implements Disposable {
                     server.send(snapshots);
                     return server.client.request("textDocument/semanticTokens/full", Map.of("textDocument", Map.of("uri", uri(file))));
                 })
-                .thenApply(result -> decodeTokens(result, server.ready.join(), text));
+                .thenApply(result -> decodeTokens(result, server.ready.join(), text))
+                .whenComplete((tokens, error) -> server.lastTokens = error != null
+                        ? "error: " + error.getMessage()
+                        : tokens.size() + " tokens for " + file.getName());
+    }
+
+    /** What happens with the TypeScript 7 server for this file: for Diagnose Highlighting / bug reports. */
+    public @NotNull List<String> describe(@NotNull VirtualFile file) {
+        List<String> lines = new ArrayList<>();
+        Path root = findRoot(file);
+        if (root == null) {
+            lines.add("TS7 root: none (no tsconfig.json / package.json above " + file.getPath() + ")");
+            return lines;
+        }
+        lines.add("TS7 root: " + root);
+        Server server = servers.get(root);
+        if (server == null) {
+            lines.add("TS7 server: not started" + (startFailures.containsKey(root) ? " - " + startFailures.get(root) : ""));
+        } else {
+            String init = !server.ready.isDone() ? "initializing" : server.ready.isCompletedExceptionally() ? "init FAILED" : "initialized";
+            lines.add("TS7 server: " + server.exe + " | " + server.client.state() + " | " + init + " | last: " + server.lastTokens);
+            String stderr = server.client.stderrTail().strip();
+            if (!stderr.isEmpty()) lines.add("TS7 stderr: " + stderr.substring(Math.max(0, stderr.length() - 300)).replace('\n', ' '));
+        }
+        TsServerLocator.explain(root).forEach(line -> lines.add("TS7 search: " + line));
+        return lines;
     }
 
     private static @NotNull List<SemanticToken> decodeTokens(@Nullable JsonElement result, @NotNull JsonElement initResult, @NotNull CharSequence text) {
@@ -193,6 +220,7 @@ public final class TsLanguageService implements Disposable {
                 return server;
             } catch (Exception e) {
                 LOG.warn("Cannot start TypeScript language server " + exe, e);
+                startFailures.put(root, exe + ": " + e.getMessage());
                 return null;
             }
         }
@@ -264,9 +292,32 @@ public final class TsLanguageService implements Disposable {
                         notifyError("npm install failed:<br>" + output.getStderr());
                         return;
                     }
+                    Path nodeModules = dir.resolve("node_modules");
+                    if (TsServerLocator.find(nodeModules.getParent()) == null) {
+                        // npm skips optional platform packages silently when the registry does not serve them
+                        String version = TsServerLocator.explain(dir).stream().filter(l -> l.contains("typescript 7"))
+                                .map(l -> l.replaceAll(".*typescript (7[^,]*),.*", "$1")).findFirst().orElse("7");
+                        String platformPackage = "@typescript/typescript-" + TsServerLocator.platform() + "@" + version;
+                        indicator.setText("Installing " + platformPackage);
+                        GeneralCommandLine platformCmd = new GeneralCommandLine(npm.getPath(), "install", "--prefix", dir.toString(),
+                                "--no-audit", "--no-fund", "--no-save", platformPackage)
+                                .withParentEnvironmentType(GeneralCommandLine.ParentEnvironmentType.CONSOLE)
+                                .withWorkingDirectory(dir);
+                        platformCmd.withEnvironment("PATH", nodeDir.getPath() + File.pathSeparator + platformCmd.getParentEnvironment().getOrDefault("PATH", ""));
+                        ProcessOutput platformOutput = new CapturingProcessHandler(platformCmd).runProcess(5 * 60 * 1000);
+                        if (TsServerLocator.find(dir) == null) {
+                            notifyError("TypeScript 7 was installed, but its binary for " + TsServerLocator.platform() + " is missing: "
+                                    + platformPackage + " could not be installed from your npm registry.<br>"
+                                    + String.join("<br>", TsServerLocator.explain(dir)) + "<br>" + platformOutput.getStderr());
+                            return;
+                        }
+                    }
                     INSTALL_SUGGESTED.set(false);
+                    restartAll();
+                    TsSemanticHighlighter.getInstance(project).scheduleOpenFiles();
                     NotificationGroupManager.getInstance().getNotificationGroup(NOTIFICATION_GROUP)
-                            .createNotification("TypeScript 7 language server installed", NotificationType.INFORMATION)
+                            .createNotification("TypeScript 7 language server installed", String.valueOf(TsServerLocator.find(dir)),
+                                    NotificationType.INFORMATION)
                             .notify(project);
                 } catch (Exception e) {
                     notifyError(e.getMessage());
@@ -320,6 +371,8 @@ public final class TsLanguageService implements Disposable {
 
     private final class Server {
         final Path root;
+        final Path exe;
+        volatile String lastTokens = "no request yet";
         final LspClient client;
         final CompletableFuture<JsonElement> ready;
         /** uri -> document modification stamp last sent to the server. */
@@ -328,6 +381,7 @@ public final class TsLanguageService implements Disposable {
 
         Server(@NotNull Path root, @NotNull Path exe) throws Exception {
             this.root = root;
+            this.exe = exe;
             this.client = LspClient.start(List.of(exe.toString(), "--lsp", "--stdio"), root.toFile());
             String rootUri = root.toUri().toString();
             Map<String, Object> capabilities = Map.of(

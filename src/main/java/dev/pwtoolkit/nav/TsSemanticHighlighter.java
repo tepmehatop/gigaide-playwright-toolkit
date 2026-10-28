@@ -43,6 +43,8 @@ import java.util.concurrent.TimeUnit;
 public final class TsSemanticHighlighter implements Disposable {
     private static final Logger LOG = Logger.getInstance(TsSemanticHighlighter.class);
     private static final Key<List<RangeHighlighter>> HIGHLIGHTERS = Key.create("pwtoolkit.semantic.highlighters");
+    /** Last result for the document, e.g. "semantic 120, brackets 68" or why semantic ranges are missing. */
+    private static final Key<String> STATS = Key.create("pwtoolkit.semantic.stats");
     private static final int DELAY_MS = 300;
     /** Just above the IDE's own info highlights (3000), which GigaIDE puts on the same words with plain colors; below warnings and errors. */
     static final int LAYER = HighlighterLayer.ADDITIONAL_SYNTAX + 1;
@@ -99,20 +101,29 @@ public final class TsSemanticHighlighter implements Disposable {
                 ? ApplicationManager.getApplication().runReadAction((Computable<List<Bracket>>) () -> collectBrackets(file))
                 : List.of();
         List<TsLanguageService.SemanticToken> tokens = List.of();
+        String problem = settings.semanticHighlighting ? null : "semantic highlighting is off in settings";
         if (settings.semanticHighlighting) {
             CompletableFuture<List<TsLanguageService.SemanticToken>> future = ApplicationManager.getApplication().runReadAction(
                     (Computable<CompletableFuture<List<TsLanguageService.SemanticToken>>>) () ->
                             TsLanguageService.getInstance(project).semanticTokens(file, document));
-            if (future != null) {
+            if (future == null) {
+                problem = "no TypeScript 7 server (see TS7 lines)";
+            } else {
                 try {
                     tokens = withImportBindings(text, future.get(15, TimeUnit.SECONDS));
+                    if (tokens.isEmpty()) problem = "TypeScript 7 returned no tokens";
                 } catch (Exception e) {
+                    problem = "tokens request failed: " + e;
                     LOG.info("[pwtoolkit] semantic highlighting: tokens request failed for " + file.getName(), e);
                 }
             }
         }
         List<TsLanguageService.SemanticToken> allTokens = tokens;
-        ApplicationManager.getApplication().invokeLater(() -> apply(document, stamp, allTokens, brackets, typeScript), project.getDisposed());
+        String stats = "semantic " + tokens.size() + ", brackets " + brackets.size() + (problem == null ? "" : " - " + problem);
+        ApplicationManager.getApplication().invokeLater(() -> {
+            apply(document, stamp, allTokens, brackets, typeScript);
+            document.putUserData(STATS, stats);
+        }, project.getDisposed());
     }
 
     private @NotNull List<Bracket> collectBrackets(@NotNull VirtualFile file) {
@@ -212,6 +223,10 @@ public final class TsSemanticHighlighter implements Disposable {
             }
         }
         return result;
+    }
+
+    public static @Nullable String stats(@NotNull Document document) {
+        return document.getUserData(STATS);
     }
 
     /** Ranges currently applied to the document (for tests and diagnostics). */

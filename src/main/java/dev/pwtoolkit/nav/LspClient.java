@@ -36,6 +36,8 @@ final class LspClient {
     private final AtomicInteger ids = new AtomicInteger();
     private final Map<Integer, CompletableFuture<JsonElement>> pending = new ConcurrentHashMap<>();
     private final String name;
+    /** Last lines of the server's stderr, for diagnostics (crashes, missing libraries...). */
+    private final StringBuilder stderrTail = new StringBuilder();
 
     private LspClient(@NotNull Process process, @NotNull String name) {
         this.process = process;
@@ -52,6 +54,21 @@ final class LspClient {
 
     boolean isAlive() {
         return process.isAlive();
+    }
+
+    @NotNull String state() {
+        if (process.isAlive()) return "running";
+        try {
+            return "exited with code " + process.exitValue();
+        } catch (IllegalThreadStateException e) {
+            return "exiting";
+        }
+    }
+
+    @NotNull String stderrTail() {
+        synchronized (stderrTail) {
+            return stderrTail.toString();
+        }
     }
 
     @NotNull CompletableFuture<JsonElement> request(@NotNull String method, @Nullable Object params) {
@@ -116,7 +133,10 @@ final class LspClient {
         } catch (Exception e) {
             LOG.debug("[" + name + "] reader stopped", e);
         }
-        failPending(new IOException("Language server exited"));
+        if (!process.isAlive()) {
+            LOG.info("[pwtoolkit] TypeScript server for " + name + " exited: " + state() + " " + stderrTail().strip());
+        }
+        failPending(new IOException("Language server exited: " + state()));
     }
 
     private static int readContentLength(@NotNull InputStream in) throws IOException {
@@ -180,7 +200,12 @@ final class LspClient {
             byte[] buffer = new byte[4096];
             int n;
             while ((n = err.read(buffer)) >= 0) {
-                if (LOG.isDebugEnabled()) LOG.debug("[" + name + "] " + new String(buffer, 0, n, StandardCharsets.UTF_8));
+                String chunk = new String(buffer, 0, n, StandardCharsets.UTF_8);
+                if (LOG.isDebugEnabled()) LOG.debug("[" + name + "] " + chunk);
+                synchronized (stderrTail) {
+                    stderrTail.append(chunk);
+                    if (stderrTail.length() > 2000) stderrTail.delete(0, stderrTail.length() - 2000);
+                }
             }
         } catch (IOException ignored) {
         }
