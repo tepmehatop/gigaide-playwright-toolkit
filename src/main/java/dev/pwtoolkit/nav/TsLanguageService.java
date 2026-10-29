@@ -91,6 +91,23 @@ public final class TsLanguageService implements Disposable {
         return server.update(file, document).thenCompose(ignored -> server.backend.definition(file.toNioPath(), line, character));
     }
 
+    /**
+     * A completion item. kind: method, function, property, variable, constant, class, interface, enum, enumMember,
+     * module, keyword, typeParameter or other. sortText orders the items like the TypeScript server does.
+     */
+    public record Completion(@NotNull String name, @NotNull String kind, @NotNull String sortText, @Nullable String insertText) {
+    }
+
+    /** Must be called inside a read action. Null when no server is available for the file. */
+    public @Nullable CompletableFuture<List<Completion>> completions(@NotNull VirtualFile file, @NotNull Document document, int offset,
+                                                                    @Nullable String trigger) {
+        Server server = serverFor(file);
+        if (server == null) return null;
+        int line = document.getLineNumber(offset);
+        int character = offset - document.getLineStartOffset(line);
+        return server.update(file, document).thenCompose(ignored -> server.backend.completions(file.toNioPath(), line, character, trigger));
+    }
+
     /** A semantic token: absolute offsets in the document text that was sent with the request. */
     public record SemanticToken(int start, int length, @NotNull String type, @NotNull Set<String> modifiers) {
     }

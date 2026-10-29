@@ -63,6 +63,7 @@ final class LspTsBackend implements TsBackend {
         String rootUri = root.toUri().toString();
         Map<String, Object> capabilities = Map.of(
                 "textDocument", Map.of("definition", Map.of("linkSupport", true),
+                        "completion", Map.of("completionItem", Map.of("snippetSupport", false), "contextSupport", true),
                         "synchronization", Map.of("didSave", false, "dynamicRegistration", false),
                         "semanticTokens", Map.of("requests", Map.of("full", true), "formats", List.of("relative"),
                                 "tokenTypes", List.of("namespace", "class", "enum", "interface", "typeParameter", "type",
@@ -122,6 +123,41 @@ final class LspTsBackend implements TsBackend {
     /** The project load, but no longer than 20 s: a server that reports nothing still gets the requests. */
     private @NotNull CompletableFuture<Void> loaded() {
         return projectLoaded.isDone() ? projectLoaded : projectLoaded.copy().completeOnTimeout(null, 20, java.util.concurrent.TimeUnit.SECONDS);
+    }
+
+    @Override
+    public @NotNull CompletableFuture<List<TsLanguageService.Completion>> completions(@NotNull Path file, int line, int character,
+                                                                                      @Nullable String trigger) {
+        Map<String, Object> params = new HashMap<>();
+        params.put("textDocument", Map.of("uri", uri(file)));
+        params.put("position", Map.of("line", line, "character", character));
+        params.put("context", trigger == null ? Map.of("triggerKind", 1) : Map.of("triggerKind", 2, "triggerCharacter", trigger));
+        return loaded().thenCompose(ignored -> client.request("textDocument/completion", params)).thenApply(LspTsBackend::parseCompletions);
+    }
+
+    /** LSP CompletionItemKind (1-based) to our kind names. */
+    private static final String[] COMPLETION_KINDS = {"other", "other", "method", "function", "method", "property", "variable", "class",
+            "interface", "module", "property", "other", "other", "enum", "keyword", "other", "other", "other", "other", "other",
+            "enumMember", "constant", "class", "other", "other", "typeParameter"};
+
+    static @NotNull List<TsLanguageService.Completion> parseCompletions(@Nullable JsonElement result) {
+        List<TsLanguageService.Completion> completions = new ArrayList<>();
+        if (result == null || result.isJsonNull()) return completions;
+        JsonArray items = result.isJsonArray() ? result.getAsJsonArray()
+                : result.getAsJsonObject().has("items") ? result.getAsJsonObject().getAsJsonArray("items") : new JsonArray();
+        for (JsonElement element : items) {
+            JsonObject item = element.getAsJsonObject();
+            String label = item.get("label").getAsString();
+            int kind = item.has("kind") ? item.get("kind").getAsInt() : 1;
+            String insert = item.has("textEdit") && item.get("textEdit").isJsonObject() && item.getAsJsonObject("textEdit").has("newText")
+                    ? item.getAsJsonObject("textEdit").get("newText").getAsString()
+                    : item.has("insertText") ? item.get("insertText").getAsString() : null;
+            // typescript-language-server replaces the dot too: newText ".name" over the range of "."
+            if (insert != null && insert.equals("." + label)) insert = label;
+            completions.add(new TsLanguageService.Completion(label, kind < COMPLETION_KINDS.length ? COMPLETION_KINDS[kind] : "other",
+                    item.has("sortText") ? item.get("sortText").getAsString() : label, insert));
+        }
+        return completions;
     }
 
     @Override

@@ -1,4 +1,9 @@
 <templateSet group="Playwright">
+  <template name="log" value="console.log($END$);" description="console.log()" toReformat="false" toShortenFQNames="false">
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
   <template name="pwt" value="test(&quot;$NAME$&quot;, async ({ page$FIXTURES$ }) =&gt; {&#10;    $END$&#10;});" description="Playwright test" toReformat="false" toShortenFQNames="false">
     <variable name="NAME" expression="" defaultValue="&quot;test name&quot;" alwaysStopAt="true"/>
     <variable name="FIXTURES" expression="" defaultValue="&quot;&quot;" alwaysStopAt="true"/>

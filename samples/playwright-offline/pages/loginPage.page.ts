@@ -27,4 +27,12 @@ export default class LoginPage {
         await this.page.fill(this.selectors.passwordInput, password);
         await this.page.click(this.selectors.submitButton);
     }
+
+    public async greetingText(): Promise<string> {
+        return await this.page.locator(this.selectors.greeting).innerText();
+    }
+
+    public async waitForApi(path: string) {
+        return await this.page.waitForResponse(response => response.url().includes(path));
+    }
 }

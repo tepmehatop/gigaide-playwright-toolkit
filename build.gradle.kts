@@ -52,7 +52,7 @@ intellijPlatform {
     buildSearchableOptions = false
     instrumentCode = false
     pluginConfiguration {
-        changeNotes = "TypeScript servers run by Node.js (tsserver.js of the project's TypeScript 5/6, bundled typescript-language-server) for machines where native binaries may not be executed; Settings | Tools | Playwright Toolkit | TypeScript server. See CHANGELOG.md."
+        changeNotes = "Code completion from the TypeScript server (page., locator., fixtures, keywords), log / .log templates, goto diagnostics. See CHANGELOG.md."
         ideaVersion {
             sinceBuild = "251"
             untilBuild = provider { null }

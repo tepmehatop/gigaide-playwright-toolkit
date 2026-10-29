@@ -26,6 +26,8 @@ public final class PwSettings implements PersistentStateComponent<PwSettings.Sta
         public int navigationTimeoutMs = 3000;
         public boolean skipPlaywrightInternals = true;
         public boolean semanticHighlighting = true;
+        /** Code completion from the TypeScript server (GigaIDE knows no types from node_modules, e.g. Playwright's Page). */
+        public boolean completion = true;
         public boolean showBrowserWhenDebugging = true;
         public boolean pauseOnFailure = true;
         public boolean disableGigaJestMarker = true;
