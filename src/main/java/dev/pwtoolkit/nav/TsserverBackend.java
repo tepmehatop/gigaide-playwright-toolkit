@@ -83,9 +83,20 @@ final class TsserverBackend implements TsBackend {
     }
 
     @Override
+    public @NotNull CompletableFuture<List<TsLanguageService.Location>> typeDefinition(@NotNull Path file, int line, int character) {
+        return locations("typeDefinition", file, line, character);
+    }
+
+    @Override
     public @NotNull CompletableFuture<List<TsLanguageService.Location>> definition(@NotNull Path file, int line, int character) {
-        return request("definition", Map.of("file", file.toString(), "line", line + 1, "offset", character + 1)).thenApply(response -> {
+        return locations("definition", file, line, character);
+    }
+
+    /** definition / typeDefinition / implementation: [{file, start: {line, offset}}], 1-based. */
+    private @NotNull CompletableFuture<List<TsLanguageService.Location>> locations(@NotNull String command, @NotNull Path file, int line, int character) {
+        return request(command, Map.of("file", file.toString(), "line", line + 1, "offset", character + 1)).handle((response, error) -> {
             List<TsLanguageService.Location> locations = new ArrayList<>();
+            if (error != null) return locations;
             JsonElement body = response.get("body");
             if (body == null || !body.isJsonArray()) return locations;
             for (JsonElement element : body.getAsJsonArray()) {

@@ -32,6 +32,11 @@
         <completion.contributor language="any" implementationClass="dev.pwtoolkit.completion.TsCompletionContributor" order="first"/>
         <typedHandler implementation="dev.pwtoolkit.completion.TsAutoPopupHandler"/>
         <findUsagesHandlerFactory implementation="dev.pwtoolkit.nav.TsFindUsagesHandlerFactory" order="first"/>
+        <typeDeclarationProvider implementation="dev.pwtoolkit.nav.TsTypeDeclarationProvider" order="first"/>
+        <codeInsight.daemonBoundCodeVisionProvider implementation="dev.pwtoolkit.nav.TsUsagesCodeVisionProvider"/>
+        <codeInsight.typeInfo language="TypeScript" implementationClass="dev.pwtoolkit.nav.TsTypeInfoProvider" order="first"/>
+        <codeInsight.typeInfo language="JavaScript" implementationClass="dev.pwtoolkit.nav.TsTypeInfoProvider" order="first"/>
+        <codeInsight.typeInfo language="TSX" implementationClass="dev.pwtoolkit.nav.TsTypeInfoProvider" order="first"/>
         <targetElementEvaluator language="TypeScript" implementationClass="dev.pwtoolkit.nav.TsTargetElementEvaluator" order="first"/>
         <targetElementEvaluator language="JavaScript" implementationClass="dev.pwtoolkit.nav.TsTargetElementEvaluator" order="first"/>
         <targetElementEvaluator language="TSX" implementationClass="dev.pwtoolkit.nav.TsTargetElementEvaluator" order="first"/>
@@ -66,9 +71,14 @@
         <liveTemplateContext contextId="PLAYWRIGHT" implementation="dev.pwtoolkit.templates.PwTemplateContextType"/>
         <defaultLiveTemplates file="/liveTemplates/Playwright.xml"/>
         <notificationGroup id="Playwright Toolkit" displayType="BALLOON"/>
+        <internalFileTemplate name="Playwright Test"/>
     </extensions>
 
     <actions>
+        <action id="dev.pwtoolkit.NewPlaywrightTest" class="dev.pwtoolkit.templates.PwNewTestAction"
+                text="Playwright Test" description="Create a Playwright test file">
+            <add-to-group group-id="NewGroup" anchor="before" relative-to-action="NewFromTemplate"/>
+        </action>
         <group id="dev.pwtoolkit.TestTreeActions">
             <separator/>
             <action id="dev.pwtoolkit.OpenTrace" class="dev.pwtoolkit.tests.PwTestTreeActions$OpenTrace"

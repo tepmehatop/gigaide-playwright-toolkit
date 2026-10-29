@@ -1,0 +1,7 @@
+${IMPORTS}
+
+test.describe("${DESCRIBE}", () => {
+    test("${DESCRIBE}", async ({ page }) => {
+
+    });
+});
