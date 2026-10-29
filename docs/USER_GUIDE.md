@@ -64,7 +64,11 @@ Project: ~/projects/autotests
 - имя под курсором подсвечивается во всём файле;
 - **Space / Ctrl+Shift+I** (Quick Definition) — код объявления во всплывающем окне;
 - **Ctrl+Shift+P** (Type Info) — тип под курсором; **Cmd+Shift+B / Ctrl+Shift+B** — к объявлению типа (`page` → `Page`);
-- над классами, функциями, методами и полями — «N usages», клик показывает использования.
+- над классами, функциями, методами и полями — «N usages», клик показывает использования;
+- **Cmd+Alt+B / Ctrl+Alt+B** (Go to Implementation) — наследники и реализации; **Cmd+U / Ctrl+U** (Go to Super) — переопределённый метод, суперкласс; значки ↑/↓ в gutter у методов, классов и интерфейсов;
+- **Ctrl+Alt+H** (Call Hierarchy) — кто вызывает функцию или метод и что вызывает она.
+
+**Рефакторинги** — **Alt+Enter** на выделении или под курсором показывает рефакторинги TypeScript: *Extract to constant / function / method*, *Convert to async function*, *Add braces to arrow function*, *Convert to template string* и др. **Extract Variable / Constant / Field / Method** — Cmd+Alt+V / C / F / M (Ctrl+Alt+… на Windows/Linux); новое имя сразу переименовывается во всех вхождениях. С нативным TypeScript 7 рефакторинги выполняет TypeScript 5: плагин предложит установить его для IDE при первом Extract.
 
 **Structure** — **Cmd+F12 / Ctrl+F12** (всплывающее окно) или окно **Structure**: классы, их поля и методы, функции, тесты файла.
 

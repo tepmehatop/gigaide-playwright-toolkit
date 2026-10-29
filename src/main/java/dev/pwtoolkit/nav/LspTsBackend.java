@@ -25,6 +25,8 @@ final class LspTsBackend implements TsBackend {
     private static final Logger LOG = Logger.getInstance(LspTsBackend.class);
 
     private final String description;
+    /** typescript-language-server forwards raw tsserver requests; the native TypeScript 7 server does not. */
+    private final boolean tsserverRequests;
     private final LspClient client;
     private final CompletableFuture<JsonElement> ready;
     /**
@@ -50,7 +52,7 @@ final class LspTsBackend implements TsBackend {
     }
 
     static @NotNull LspTsBackend nativeServer(@NotNull Path root, @NotNull Path exe) throws Exception {
-        LspTsBackend backend = new LspTsBackend(root, List.of(exe.toString(), "--lsp", "--stdio"), null, "native TypeScript 7: " + exe);
+        LspTsBackend backend = new LspTsBackend(root, List.of(exe.toString(), "--lsp", "--stdio"), null, "native TypeScript 7: " + exe, false);
         backend.projectLoaded.complete(null);
         return backend;
     }
@@ -60,12 +62,13 @@ final class LspTsBackend implements TsBackend {
         Map<String, Object> options = Map.of("tsserver", Map.of("path", tsserver.path().toString()),
                 "hostInfo", "playwright-toolkit", "disableAutomaticTypingAcquisition", true, "preferences", INLAY_PREFERENCES);
         return new LspTsBackend(root, List.of(node, cli.toString(), "--stdio"), options,
-                "typescript-language-server + TypeScript " + tsserver.version() + " via node: " + tsserver.path());
+                "typescript-language-server + TypeScript " + tsserver.version() + " via node: " + tsserver.path(), true);
     }
 
     private LspTsBackend(@NotNull Path root, @NotNull List<String> command, @Nullable Map<String, Object> initializationOptions,
-                         @NotNull String description) throws Exception {
+                         @NotNull String description, boolean tsserverRequests) throws Exception {
         this.description = description;
+        this.tsserverRequests = tsserverRequests;
         this.client = LspClient.start(command, root.toFile());
         JsonElement settings = languageSettings();
         client.onConfiguration(section -> section.equals("typescript") || section.equals("javascript") || section.equals("js/ts") ? settings : null);
@@ -100,6 +103,8 @@ final class LspTsBackend implements TsBackend {
                                 "documentationFormat", List.of("plaintext", "markdown"), "activeParameterSupport", true))),
                         Map.entry("hover", Map.of("contentFormat", List.of("markdown", "plaintext"))),
                         Map.entry("references", Map.of()),
+                        Map.entry("implementation", Map.of("linkSupport", true)),
+                        Map.entry("callHierarchy", Map.of()),
                         Map.entry("inlayHint", Map.of()),
                         Map.entry("documentSymbol", Map.of("hierarchicalDocumentSymbolSupport", true)),
                         Map.entry("diagnostic", Map.of("dynamicRegistration", false)),
@@ -388,6 +393,72 @@ final class LspTsBackend implements TsBackend {
             }
             return hints;
         });
+    }
+
+    boolean supportsTsserverRequests() {
+        return tsserverRequests;
+    }
+
+    @Override
+    public @NotNull CompletableFuture<JsonObject> tsserverRequest(@NotNull String command, @NotNull Map<String, Object> arguments) {
+        if (!tsserverRequests) return CompletableFuture.failedFuture(new UnsupportedOperationException("not supported by " + description));
+        return loaded().thenCompose(ignored -> client.request("workspace/executeCommand",
+                Map.of("command", "typescript.tsserverRequest", "arguments", List.of(command, arguments)))).thenApply(result -> {
+            if (result == null || !result.isJsonObject()) throw new IllegalStateException("no response to " + command);
+            JsonObject response = result.getAsJsonObject();
+            if (response.has("success") && !response.get("success").getAsBoolean()) {
+                throw new IllegalStateException(response.has("message") ? response.get("message").getAsString() : command + " failed");
+            }
+            return response;
+        });
+    }
+
+    @Override
+    public @NotNull CompletableFuture<List<TsLanguageService.Location>> implementation(@NotNull Path file, int line, int character) {
+        Map<String, Object> params = Map.of("textDocument", Map.of("uri", uri(file)), "position", Map.of("line", line, "character", character));
+        return loaded().thenCompose(ignored -> client.request("textDocument/implementation", params)).thenApply(LspTsBackend::parseLocations);
+    }
+
+    @Override
+    public @NotNull CompletableFuture<List<TsLanguageService.CallItem>> prepareCallHierarchy(@NotNull Path file, int line, int character) {
+        Map<String, Object> params = Map.of("textDocument", Map.of("uri", uri(file)), "position", Map.of("line", line, "character", character));
+        return loaded().thenCompose(ignored -> client.request("textDocument/prepareCallHierarchy", params)).thenApply(result -> {
+            List<TsLanguageService.CallItem> items = new ArrayList<>();
+            if (result != null && result.isJsonArray()) {
+                for (JsonElement element : result.getAsJsonArray()) {
+                    TsLanguageService.CallItem item = callItem(element.getAsJsonObject());
+                    if (item != null) items.add(item);
+                }
+            }
+            return items;
+        });
+    }
+
+    @Override
+    public @NotNull CompletableFuture<List<TsLanguageService.CallItem>> calls(@NotNull TsLanguageService.CallItem item, boolean incoming) {
+        if (item.raw() == null) return CompletableFuture.completedFuture(List.of());
+        return client.request(incoming ? "callHierarchy/incomingCalls" : "callHierarchy/outgoingCalls", Map.of("item", item.raw())).thenApply(result -> {
+            List<TsLanguageService.CallItem> items = new ArrayList<>();
+            if (result == null || !result.isJsonArray()) return items;
+            for (JsonElement element : result.getAsJsonArray()) {
+                JsonObject call = element.getAsJsonObject();
+                TsLanguageService.CallItem other = callItem(call.getAsJsonObject(incoming ? "from" : "to"));
+                if (other != null) items.add(other);
+            }
+            return items;
+        });
+    }
+
+    private static @Nullable TsLanguageService.CallItem callItem(@NotNull JsonObject item) {
+        try {
+            int kind = item.has("kind") ? item.get("kind").getAsInt() : 0;
+            return new TsLanguageService.CallItem(item.get("name").getAsString(), kind < SYMBOL_KINDS.length ? SYMBOL_KINDS[kind] : "other",
+                    item.has("detail") ? item.get("detail").getAsString() : "", Path.of(new URI(item.get("uri").getAsString())),
+                    range(item.getAsJsonObject("range")), range(item.getAsJsonObject("selectionRange")), item);
+        } catch (Exception e) {
+            LOG.debug("Unsupported call hierarchy item " + item, e);
+            return null;
+        }
     }
 
     /** A string or a MarkupContent {kind, value}. */

@@ -52,7 +52,7 @@ intellijPlatform {
     buildSearchableOptions = false
     instrumentCode = false
     pluginConfiguration {
-        changeNotes = "Type Info, Go to Type Declaration, usages Code Vision, IDEA postfix templates, New | Playwright Test. See CHANGELOG.md."
+        changeNotes = "TypeScript refactorings on Alt+Enter, Extract Variable/Constant/Field/Method with in-place rename, Go to Implementation and Super, override gutter icons, Call Hierarchy. See CHANGELOG.md."
         ideaVersion {
             sinceBuild = "251"
             untilBuild = provider { null }

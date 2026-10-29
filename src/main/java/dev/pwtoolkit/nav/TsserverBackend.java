@@ -83,6 +83,50 @@ final class TsserverBackend implements TsBackend {
     }
 
     @Override
+    public @NotNull CompletableFuture<JsonObject> tsserverRequest(@NotNull String command, @NotNull Map<String, Object> arguments) {
+        return request(command, arguments);
+    }
+
+    @Override
+    public @NotNull CompletableFuture<List<TsLanguageService.Location>> implementation(@NotNull Path file, int line, int character) {
+        return locations("implementation", file, line, character);
+    }
+
+    @Override
+    public @NotNull CompletableFuture<List<TsLanguageService.CallItem>> prepareCallHierarchy(@NotNull Path file, int line, int character) {
+        return request("prepareCallHierarchy", Map.of("file", file.toString(), "line", line + 1, "offset", character + 1)).handle((response, error) -> {
+            List<TsLanguageService.CallItem> items = new ArrayList<>();
+            if (error != null || response.get("body") == null) return items;
+            JsonElement body = response.get("body");
+            if (body.isJsonArray()) {
+                for (JsonElement element : body.getAsJsonArray()) items.add(callItem(element.getAsJsonObject()));
+            } else if (body.isJsonObject()) {
+                items.add(callItem(body.getAsJsonObject()));
+            }
+            return items;
+        });
+    }
+
+    @Override
+    public @NotNull CompletableFuture<List<TsLanguageService.CallItem>> calls(@NotNull TsLanguageService.CallItem item, boolean incoming) {
+        Map<String, Object> at = Map.of("file", item.file().toString(), "line", item.selection().line() + 1, "offset", item.selection().character() + 1);
+        return request(incoming ? "provideCallHierarchyIncomingCalls" : "provideCallHierarchyOutgoingCalls", at).handle((response, error) -> {
+            List<TsLanguageService.CallItem> items = new ArrayList<>();
+            if (error != null || response.get("body") == null || !response.get("body").isJsonArray()) return items;
+            for (JsonElement element : response.getAsJsonArray("body")) {
+                items.add(callItem(element.getAsJsonObject().getAsJsonObject(incoming ? "from" : "to")));
+            }
+            return items;
+        });
+    }
+
+    private static @NotNull TsLanguageService.CallItem callItem(@NotNull JsonObject item) {
+        return new TsLanguageService.CallItem(item.get("name").getAsString(), symbolKind(item.get("kind").getAsString()),
+                item.has("containerName") ? item.get("containerName").getAsString() : "", Path.of(item.get("file").getAsString()),
+                span(item.getAsJsonObject("span")), span(item.getAsJsonObject("selectionSpan")), item);
+    }
+
+    @Override
     public @NotNull CompletableFuture<List<TsLanguageService.Location>> typeDefinition(@NotNull Path file, int line, int character) {
         return locations("typeDefinition", file, line, character);
     }
@@ -344,7 +388,7 @@ final class TsserverBackend implements TsBackend {
     }
 
     /** FileCodeEdits[]: [{fileName, textChanges: [{start: {line, offset}, end, newText}]}], 1-based. */
-    private static @NotNull List<TsLanguageService.Edit> changes(@Nullable JsonArray changes) {
+    static @NotNull List<TsLanguageService.Edit> changes(@Nullable JsonArray changes) {
         List<TsLanguageService.Edit> edits = new ArrayList<>();
         if (changes == null) return edits;
         for (JsonElement change : changes) {

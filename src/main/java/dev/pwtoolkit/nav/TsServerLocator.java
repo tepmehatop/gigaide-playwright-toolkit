@@ -100,6 +100,17 @@ public final class TsServerLocator {
         return null;
     }
 
+    /** TypeScript 5 installed by the plugin for refactorings (the native TypeScript 7 server has none yet). */
+    public static @Nullable Tsserver managedTsserver() {
+        Path typescript = managedTypeScript5Dir().resolve("node_modules").resolve("typescript");
+        Path js = typescript.resolve("lib").resolve("tsserver.js");
+        return Files.isRegularFile(js) ? new Tsserver(js, version(typescript.resolve("package.json"))) : null;
+    }
+
+    public static @NotNull Path managedTypeScript5Dir() {
+        return PathManager.getSystemDir().resolve("playwright-toolkit").resolve("typescript5");
+    }
+
     /** Where "Install TypeScript 7" puts its own copy (outside of any user project). */
     public static @NotNull Path managedInstallDir() {
         return PathManager.getSystemDir().resolve("playwright-toolkit").resolve("typescript7");
