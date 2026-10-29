@@ -42,6 +42,22 @@ interface TsBackend {
     /** Declaration of the type of the symbol at the position: page -> interface Page. */
     @NotNull CompletableFuture<List<TsLanguageService.Location>> typeDefinition(@NotNull Path file, int line, int character);
 
+    /** Implementations of the symbol at the position (classes implementing an interface, overriding methods). */
+    @NotNull CompletableFuture<List<TsLanguageService.Location>> implementation(@NotNull Path file, int line, int character);
+
+    /** The call hierarchy item (function, method) at the position. */
+    @NotNull CompletableFuture<List<TsLanguageService.CallItem>> prepareCallHierarchy(@NotNull Path file, int line, int character);
+
+    /** Who calls {@code item} (incoming) or what it calls (outgoing). */
+    @NotNull CompletableFuture<List<TsLanguageService.CallItem>> calls(@NotNull TsLanguageService.CallItem item, boolean incoming);
+
+    /**
+     * A raw tsserver request (refactorings: getApplicableRefactors, getEditsForRefactor): tsserver.js directly,
+     * typescript-language-server through its "typescript.tsserverRequest" command. The native TypeScript 7 server has no
+     * refactorings yet: the future fails.
+     */
+    @NotNull CompletableFuture<com.google.gson.JsonObject> tsserverRequest(@NotNull String command, @NotNull java.util.Map<String, Object> arguments);
+
     /** Signatures of the call around the position (parameter info). */
     @NotNull CompletableFuture<TsLanguageService.SignatureHelp> signatureHelp(@NotNull Path file, int line, int character);
 

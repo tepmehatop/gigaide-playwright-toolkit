@@ -32,6 +32,20 @@
         <completion.contributor language="any" implementationClass="dev.pwtoolkit.completion.TsCompletionContributor" order="first"/>
         <typedHandler implementation="dev.pwtoolkit.completion.TsAutoPopupHandler"/>
         <findUsagesHandlerFactory implementation="dev.pwtoolkit.nav.TsFindUsagesHandlerFactory" order="first"/>
+        <intentionMenuContributor implementation="dev.pwtoolkit.refactor.TsRefactorIntentions"/>
+        <definitionsScopedSearch implementation="dev.pwtoolkit.nav.TsImplementationSearch"/>
+        <callHierarchyProvider language="TypeScript" implementationClass="dev.pwtoolkit.nav.TsCallHierarchyProvider" order="first"/>
+        <callHierarchyProvider language="JavaScript" implementationClass="dev.pwtoolkit.nav.TsCallHierarchyProvider" order="first"/>
+        <callHierarchyProvider language="TSX" implementationClass="dev.pwtoolkit.nav.TsCallHierarchyProvider" order="first"/>
+        <codeInsight.gotoSuper language="TypeScript" implementationClass="dev.pwtoolkit.nav.TsGotoSuperHandler" order="first"/>
+        <codeInsight.lineMarkerProvider language="TypeScript" implementationClass="dev.pwtoolkit.nav.TsHierarchyLineMarkerProvider"/>
+        <codeInsight.gotoSuper language="JavaScript" implementationClass="dev.pwtoolkit.nav.TsGotoSuperHandler" order="first"/>
+        <codeInsight.lineMarkerProvider language="JavaScript" implementationClass="dev.pwtoolkit.nav.TsHierarchyLineMarkerProvider"/>
+        <codeInsight.gotoSuper language="TSX" implementationClass="dev.pwtoolkit.nav.TsGotoSuperHandler" order="first"/>
+        <codeInsight.lineMarkerProvider language="TSX" implementationClass="dev.pwtoolkit.nav.TsHierarchyLineMarkerProvider"/>
+        <lang.refactoringSupport language="TypeScript" implementationClass="dev.pwtoolkit.refactor.TsRefactoringSupport" order="first"/>
+        <lang.refactoringSupport language="JavaScript" implementationClass="dev.pwtoolkit.refactor.TsRefactoringSupport" order="first"/>
+        <lang.refactoringSupport language="TSX" implementationClass="dev.pwtoolkit.refactor.TsRefactoringSupport" order="first"/>
         <typeDeclarationProvider implementation="dev.pwtoolkit.nav.TsTypeDeclarationProvider" order="first"/>
         <codeInsight.daemonBoundCodeVisionProvider implementation="dev.pwtoolkit.nav.TsUsagesCodeVisionProvider"/>
         <codeInsight.typeInfo language="TypeScript" implementationClass="dev.pwtoolkit.nav.TsTypeInfoProvider" order="first"/>

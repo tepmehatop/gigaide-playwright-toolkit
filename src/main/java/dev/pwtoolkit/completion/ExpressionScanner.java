@@ -7,11 +7,11 @@ import org.jetbrains.annotations.NotNull;
  * calls and indexes with balanced brackets, string and template literals, numbers, a non-null {@code !}.
  * {@code await page.title()} gives {@code page.title()}; {@code (await page.title())} is one expression.
  */
-final class ExpressionScanner {
+public final class ExpressionScanner {
     private ExpressionScanner() {
     }
 
-    static int start(@NotNull CharSequence text, int end) {
+    public static int start(@NotNull CharSequence text, int end) {
         int i = end;
         while (i > 0) {
             char c = text.charAt(i - 1);

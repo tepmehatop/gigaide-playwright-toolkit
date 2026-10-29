@@ -151,6 +151,68 @@ public final class TsLanguageService implements Disposable {
         return server.update(file, document).thenCompose(ignored -> server.backend.inlayHints(file.toNioPath(), text));
     }
 
+    /** A function or method of the call hierarchy; {@code raw} is the server's own item, sent back for its calls. */
+    public record CallItem(@NotNull String name, @NotNull String kind, @NotNull String detail, @NotNull Path file, @NotNull Range range,
+                           @NotNull Range selection, @Nullable com.google.gson.JsonElement raw) {
+        String key() {
+            return file + ":" + selection.line() + ":" + selection.character();
+        }
+    }
+
+    /** Must be called inside a read action. Null when no server is available for the file. */
+    public @Nullable CompletableFuture<List<Location>> implementation(@NotNull VirtualFile file, @NotNull Document document, int offset) {
+        Server server = serverFor(file);
+        if (server == null) return null;
+        int line = document.getLineNumber(offset);
+        int character = offset - document.getLineStartOffset(line);
+        return server.update(file, document).thenCompose(ignored -> server.backend.implementation(file.toNioPath(), line, character));
+    }
+
+    /** Must be called inside a read action. Null when no server is available for the file. */
+    public @Nullable CompletableFuture<List<CallItem>> prepareCallHierarchy(@NotNull VirtualFile file, @NotNull Document document, int offset) {
+        Server server = serverFor(file);
+        if (server == null) return null;
+        int line = document.getLineNumber(offset);
+        int character = offset - document.getLineStartOffset(line);
+        return server.update(file, document).thenCompose(ignored -> server.backend.prepareCallHierarchy(file.toNioPath(), line, character));
+    }
+
+    /** Must be called inside a read action. Null when no server is available for the file. */
+    public @Nullable CompletableFuture<List<CallItem>> calls(@NotNull VirtualFile file, @NotNull Document document, @NotNull CallItem item, boolean incoming) {
+        Server server = serverFor(file);
+        if (server == null) return null;
+        return server.update(file, document).thenCompose(ignored -> server.backend.calls(item, incoming));
+    }
+
+    /**
+     * A raw tsserver request for refactorings. With the native TypeScript 7 server (no refactorings yet) it goes to a
+     * tsserver.js of TypeScript 5/6 started next to it, when one is found. Must be called inside a read action.
+     */
+    public @Nullable CompletableFuture<com.google.gson.JsonObject> tsserverRequest(@NotNull VirtualFile file, @NotNull Document document,
+                                                                               @NotNull String command, @NotNull java.util.Map<String, Object> arguments) {
+        Server server = serverFor(file);
+        if (server == null) return null;
+        TsBackend refactoring = server.refactoringBackend();
+        if (refactoring == null) return null;
+        if (refactoring == server.backend) {
+            return server.update(file, document).thenCompose(ignored -> server.backend.tsserverRequest(command, arguments));
+        }
+        // the side tsserver gets the current text of this file only (other files are read from disk)
+        String text = document.getText();
+        return refactoring.ready().thenCompose(ignored -> {
+            refactoring.sync(List.of(new TsBackend.DocumentChange(file.toNioPath(), JsFiles.languageId(file.getName()), text, 1, false)));
+            return refactoring.tsserverRequest(command, arguments);
+        });
+    }
+
+    /** Why refactorings are not available for the file, or null when they are. */
+    public @Nullable String refactoringsUnavailableReason(@NotNull VirtualFile file) {
+        Server server = serverFor(file);
+        if (server == null) return "no TypeScript server";
+        return server.refactoringBackend() == null
+                ? "the native TypeScript 7 server has no refactorings yet, and no TypeScript 5/6 (lib/tsserver.js) was found for them" : null;
+    }
+
     public record Reference(@NotNull Path file, @NotNull Range range, boolean definition) {
     }
 
@@ -479,6 +541,52 @@ public final class TsLanguageService implements Disposable {
         }.queue();
     }
 
+    /** Refactorings with the native TypeScript 7 server: a TypeScript 5 next to the IDE (not in the project) runs them. */
+    public void suggestTypeScript5ForRefactorings() {
+        NotificationGroupManager.getInstance().getNotificationGroup(NOTIFICATION_GROUP)
+                .createNotification("TypeScript refactorings need TypeScript 5",
+                        "The native TypeScript 7 server has no refactorings (Extract, Convert...) yet. The plugin can run them with a "
+                                + "TypeScript 5 installed for the IDE, outside of your project.", NotificationType.INFORMATION)
+                .addAction(NotificationAction.createSimpleExpiring("Install TypeScript 5 for the IDE", this::installTypeScript5))
+                .notify(project);
+    }
+
+    private void installTypeScript5() {
+        new Task.Backgroundable(project, "Installing TypeScript 5 for refactorings", false) {
+            @Override
+            public void run(@NotNull ProgressIndicator indicator) {
+                String node = NodeLocator.findNode(null);
+                if (node == null) {
+                    notifyError("Node.js was not found. Configure it in Settings | Tools | Playwright Toolkit.");
+                    return;
+                }
+                Path dir = TsServerLocator.managedTypeScript5Dir();
+                try {
+                    Files.createDirectories(dir);
+                    File nodeDir = new File(node).getParentFile();
+                    File npm = new File(nodeDir, SystemInfo.isWindows ? "npm.cmd" : "npm");
+                    GeneralCommandLine cmd = new GeneralCommandLine(npm.getPath(), "install", "--prefix", dir.toString(),
+                            "--no-audit", "--no-fund", "typescript@5")
+                            .withParentEnvironmentType(GeneralCommandLine.ParentEnvironmentType.CONSOLE)
+                            .withWorkingDirectory(dir);
+                    cmd.withEnvironment("PATH", nodeDir.getPath() + File.pathSeparator + cmd.getParentEnvironment().getOrDefault("PATH", ""));
+                    ProcessOutput output = new CapturingProcessHandler(cmd).runProcess(5 * 60 * 1000);
+                    if (output.getExitCode() != 0 || TsServerLocator.managedTsserver() == null) {
+                        notifyError("npm install typescript@5 failed:<br>" + output.getStderr());
+                        return;
+                    }
+                    restartAll();
+                    NotificationGroupManager.getInstance().getNotificationGroup(NOTIFICATION_GROUP)
+                            .createNotification("TypeScript 5 for refactorings installed", String.valueOf(TsServerLocator.managedTsserver().path()),
+                                    NotificationType.INFORMATION)
+                            .notify(project);
+                } catch (Exception e) {
+                    notifyError(e.getMessage());
+                }
+            }
+        }.queue();
+    }
+
     private void notifyError(@Nullable String message) {
         NotificationGroupManager.getInstance().getNotificationGroup(NOTIFICATION_GROUP)
                 .createNotification("Playwright Toolkit", String.valueOf(message), NotificationType.ERROR)
@@ -495,10 +603,34 @@ public final class TsLanguageService implements Disposable {
         /** Document updates are sent strictly in order, and each request only after its own update. */
         private CompletableFuture<?> synced;
 
+        /** tsserver.js next to the native server, for refactorings; started on first use. */
+        private TsBackend sidecar;
+        private boolean sidecarTried;
+
         Server(@NotNull Path root, @NotNull TsBackend backend) {
             this.root = root;
             this.backend = backend;
             this.synced = backend.ready();
+        }
+
+        /** The backend that answers tsserver requests: this one, or a side tsserver.js for the native server. */
+        synchronized @Nullable TsBackend refactoringBackend() {
+            if (!(backend instanceof LspTsBackend lsp) || lsp.supportsTsserverRequests()) return backend;
+            if (sidecar != null && sidecar.isAlive()) return sidecar;
+            if (sidecarTried) return null;
+            sidecarTried = true;
+            TsServerLocator.Tsserver tsserver = TsServerLocator.findTsserver(root);
+            if (tsserver == null) tsserver = TsServerLocator.managedTsserver();
+            String node = NodeLocator.findNode(null);
+            if (tsserver == null || node == null) return null;
+            try {
+                sidecar = new TsserverBackend(root, node, tsserver.path(), tsserver.version());
+                LOG.info("[pwtoolkit] refactorings for " + root + ": " + sidecar.description());
+                return sidecar;
+            } catch (Exception e) {
+                LOG.warn("Cannot start tsserver.js for refactorings", e);
+                return null;
+            }
         }
 
         /** Must be called inside a read action. Completes once the server has seen the current editor state. */
@@ -547,6 +679,7 @@ public final class TsLanguageService implements Disposable {
 
         void stop() {
             backend.shutdown();
+            if (sidecar != null) sidecar.shutdown();
         }
     }
 }

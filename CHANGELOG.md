@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.11.0
+
+- **Alt+Enter без ошибки — рефакторинги TypeScript** для выделения или места под курсором: *Extract to constant / function / method / readonly field*, *Convert to async function*, *Add / Remove braces from arrow function*, *Convert to template string*, *Convert named / default export*, *Move to a new file* и другие.
+- **Extract Variable / Constant / Field / Method** (Cmd+Alt+V / C / F / M, на Windows и Linux Ctrl+Alt+…). Без выделения берётся выражение под курсором (для Extract Method — строка). Если областей несколько, IDE предложит выбрать. Новое имя сразу переименовывается на месте во всех вхождениях, как в IDEA.
+- С нативным TypeScript 7 (в нём рефакторингов пока нет) они выполняются через TypeScript 5 из проекта или установленный для IDE: при первом Extract плагин предложит *Install TypeScript 5 for the IDE* (в служебную папку IDE, не в проект).
+- **Go to Implementation (Cmd+Alt+B / Ctrl+Alt+B)** — наследники класса, реализации интерфейса, переопределения метода.
+- **Go to Super (Cmd+U / Ctrl+U)** — переопределённый метод или реализуемый член интерфейса, суперкласс.
+- **Значки в gutter, как в IDEA**: ↑ «Overrides BasePage.open» / «Implements Opens.open» у методов и полей; ↓ «Has subclasses» / «Has implementations» у классов и интерфейсов, «Overridden in …» у их членов. Клик — переход.
+- **Call Hierarchy (Ctrl+Alt+H)** — дерево «кто вызывает» / «что вызывает» для функций и методов.
+
 ## 1.10.0
 
 - **Type Info (Ctrl+Shift+P)** — тип имени под курсором: `loginPage` → `LoginPage`, `page` → `Page`.
