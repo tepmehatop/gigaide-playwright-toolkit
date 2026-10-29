@@ -58,6 +58,8 @@ public final class TsGotoDeclarationHandler implements GotoDeclarationHandler {
         }
         if (locations != null && locations.isEmpty()) locations = playwrightMembers(file, editor.getDocument(), offset);
         if (locations == null || locations.isEmpty()) return null;
+        // Ctrl+Click on a declaration: no target here, the IDE then shows its usages (like IntelliJ IDEA)
+        if (locations.size() == 1 && isAt(locations.get(0), file, editor.getDocument(), offset)) return null;
 
         List<PsiElement> targets = new ArrayList<>();
         for (TsLanguageService.Location location : locations) {
@@ -65,6 +67,15 @@ public final class TsGotoDeclarationHandler implements GotoDeclarationHandler {
             if (target != null) targets.add(target);
         }
         return targets.isEmpty() ? null : targets.toArray(PsiElement.EMPTY_ARRAY);
+    }
+
+    private static boolean isAt(TsLanguageService.Location location, VirtualFile file, Document document, int offset) {
+        if (!location.file().equals(file.toNioPath()) || location.line() >= document.getLineCount()) return false;
+        int start = TsEdits.offset(document, location.line(), location.character());
+        CharSequence text = document.getImmutableCharSequence();
+        int end = start;
+        while (end < text.length() && Character.isJavaIdentifierPart(text.charAt(end))) end++;
+        return start <= offset && offset <= end;
     }
 
     /** TypeScript knows nothing about the receiver (an untyped parameter): Playwright's members with this name. */

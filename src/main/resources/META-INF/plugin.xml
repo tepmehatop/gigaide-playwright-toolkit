@@ -31,7 +31,10 @@
         <gotoDeclarationHandler implementation="dev.pwtoolkit.nav.TsGotoDeclarationHandler" order="first"/>
         <completion.contributor language="any" implementationClass="dev.pwtoolkit.completion.TsCompletionContributor" order="first"/>
         <typedHandler implementation="dev.pwtoolkit.completion.TsAutoPopupHandler"/>
-        <actionPromoter implementation="dev.pwtoolkit.nav.TsFindUsagesAction$Promoter"/>
+        <findUsagesHandlerFactory implementation="dev.pwtoolkit.nav.TsFindUsagesHandlerFactory" order="first"/>
+        <targetElementEvaluator language="TypeScript" implementationClass="dev.pwtoolkit.nav.TsTargetElementEvaluator" order="first"/>
+        <targetElementEvaluator language="JavaScript" implementationClass="dev.pwtoolkit.nav.TsTargetElementEvaluator" order="first"/>
+        <targetElementEvaluator language="TSX" implementationClass="dev.pwtoolkit.nav.TsTargetElementEvaluator" order="first"/>
         <lang.psiStructureViewFactory language="TypeScript" implementationClass="dev.pwtoolkit.nav.TsStructureViewFactory" order="first"/>
         <lang.psiStructureViewFactory language="JavaScript" implementationClass="dev.pwtoolkit.nav.TsStructureViewFactory" order="first"/>
         <lang.psiStructureViewFactory language="TSX" implementationClass="dev.pwtoolkit.nav.TsStructureViewFactory" order="first"/>
@@ -66,11 +69,6 @@
     </extensions>
 
     <actions>
-        <action id="dev.pwtoolkit.FindUsages" class="dev.pwtoolkit.nav.TsFindUsagesAction"
-                text="Find Usages (TypeScript)" description="Find usages of the symbol at the caret with the TypeScript server">
-            <keyboard-shortcut keymap="$default" first-keystroke="alt F7"/>
-            <add-to-group group-id="EditorPopupMenu" anchor="after" relative-to-action="FindUsages"/>
-        </action>
         <group id="dev.pwtoolkit.TestTreeActions">
             <separator/>
             <action id="dev.pwtoolkit.OpenTrace" class="dev.pwtoolkit.tests.PwTestTreeActions$OpenTrace"
