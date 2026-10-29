@@ -163,10 +163,11 @@ public final class PwConfigurable implements SearchableConfigurable {
         s.skipPlaywrightInternals = skipInternals.isSelected();
         s.semanticHighlighting = semanticHighlighting.isSelected();
         s.completion = completion.isSelected();
-        if (s.diagnostics && !diagnostics.isSelected()) {
-            for (var project : ProjectManager.getInstance().getOpenProjects()) dev.pwtoolkit.nav.TsSemanticHighlighter.getInstance(project).clearDiagnostics();
-        }
+        boolean diagnosticsChanged = s.diagnostics != diagnostics.isSelected();
         s.diagnostics = diagnostics.isSelected();
+        if (diagnosticsChanged) {
+            for (var project : ProjectManager.getInstance().getOpenProjects()) com.intellij.codeInsight.daemon.DaemonCodeAnalyzer.getInstance(project).restart();
+        }
         s.rainbowBrackets = rainbowBrackets.isSelected();
         s.showBrowserWhenDebugging = showBrowser.isSelected();
         s.pauseOnFailure = pauseOnFailure.isSelected();

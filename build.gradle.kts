@@ -52,7 +52,7 @@ intellijPlatform {
     buildSearchableOptions = false
     instrumentCode = false
     pluginConfiguration {
-        changeNotes = "TypeScript errors in the editor with quick fixes (Alt+Enter: Add import), auto-import in completion, Playwright API for untyped receivers. See CHANGELOG.md."
+        changeNotes = "TypeScript errors with tooltips, light bulb and Alt+Enter fixes (Annotate page as Page, Add import), parameter info, quick documentation on hover. See CHANGELOG.md."
         ideaVersion {
             sinceBuild = "251"
             untilBuild = provider { null }

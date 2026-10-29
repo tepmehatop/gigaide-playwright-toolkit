@@ -70,24 +70,8 @@ public class TsDiagnosticsTest extends BasePlatformTestCase {
         assertEquals(HighlightSeverity.ERROR, error.getSeverity());
         assertTrue(error.getDescription(), error.getDescription().contains("Cannot find name 'selectFromDropDown'"));
 
-        List<String> fixes = fixTexts(error);
-        assertTrue(fixes.toString(), fixes.stream().anyMatch(t -> t.startsWith("Add import from")));
-
-        // the IDE's own analysis replaces the highlighting, the plugin puts the problems back when it finishes
-        myFixture.doHighlighting();
-        getProject().getMessageBus().syncPublisher(com.intellij.codeInsight.daemon.DaemonCodeAnalyzer.DAEMON_EVENT_TOPIC)
-                .daemonFinished(List.of(com.intellij.openapi.fileEditor.FileEditorManager.getInstance(getProject())
-                        .getSelectedEditor(myFixture.getFile().getVirtualFile())));
-        HighlightInfo restored = DaemonCodeAnalyzerImpl.getHighlights(document, HighlightSeverity.ERROR, getProject()).stream()
-                .filter(i -> i.getDescription() != null && i.getDescription().contains("Cannot find name 'selectFromDropDown'")).findFirst().orElse(null);
-        assertNotNull("error is gone after the IDE's analysis", restored);
-
-        // Alt+Enter
-        myFixture.getEditor().getCaretModel().moveToOffset(document.getText().indexOf("selectFromDropDown(page"));
-        List<IntentionAction> intentions = myFixture.getAvailableIntentions();
-        IntentionAction addImport = intentions.stream().filter(i -> i.getText().startsWith("Add import from")).findFirst().orElse(null);
-        assertNotNull(intentions.stream().map(IntentionAction::getText).toList().toString(), addImport);
-        com.intellij.codeInsight.intention.impl.ShowIntentionActionsHandler.chooseActionAndInvoke(myFixture.getFile(), myFixture.getEditor(), addImport, addImport.getText());
+        assertTrue(intentionsAt("selectFromDropDown(page").toString(), intentionsAt("selectFromDropDown(page").stream().anyMatch(t -> t.startsWith("Add import from")));
+        launch("selectFromDropDown(page", "Add import from");
         assertTrue(document.getText(), document.getText().contains("import { selectFromDropDown } from \"../../utils/customHelpers\""));
     }
 
@@ -110,6 +94,9 @@ public class TsDiagnosticsTest extends BasePlatformTestCase {
     public void testUntypedPageFallsBackToPlaywrightApi() {
         open("utils/customHelpers.ts", "    await page.waitForTimeout(300);", "    await page.waitForSel");
         waitForProblem("page,"); // implicit any: the server works and has answered
+        TsSemanticHighlighter.getInstance(getProject()).highlight(myFixture.getFile().getVirtualFile());
+        PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue();
+        assertTrue(intentionsAt("page,").toString(), intentionsAt("page,").contains("Annotate 'page' as Page (@playwright/test)"));
 
         int offset = document.getText().indexOf("click(locator)");
         var source = myFixture.getFile().findElementAt(offset);
@@ -130,13 +117,24 @@ public class TsDiagnosticsTest extends BasePlatformTestCase {
         assertTrue(text, items == null ? text.contains("page.waitForSelector()") : Arrays.stream(items).anyMatch(i -> i.getLookupString().equals("waitForSelector")));
     }
 
-    private static List<String> fixTexts(HighlightInfo info) {
-        List<String> texts = new java.util.ArrayList<>();
-        info.findRegisteredQuickFix((descriptor, range) -> {
-            texts.add(descriptor.getAction().getText());
-            return null;
-        });
-        return texts;
+    /** The mistakes from the bug report: untyped page, "name = string". */
+    public void testFixesForHelperParameters() {
+        open("utils/customHelpers.ts", "export async function", "");
+        WriteCommandAction.runWriteCommandAction(getProject(), () -> document.setText(document.getText().replace("page, name, locator", "page, name = string, locator")));
+        PsiDocumentManager.getInstance(getProject()).commitAllDocuments();
+        HighlightInfo typeAsValue = waitForProblem("string, locator");
+        assertTrue(typeAsValue.getDescription(), typeAsValue.getDescription().contains("only refers to a type"));
+        launch("string, locator", "Change '= string' to ': string'");
+        assertTrue(document.getText(), document.getText().contains("page, name: string, locator"));
+
+        waitForProblem("page,");
+        launch("page,", "Annotate 'page' as Page");
+        String text = document.getText();
+        assertTrue(text, text.startsWith("import { Page } from \"@playwright/test\";\n"));
+        assertTrue(text, text.contains("selectFromDropDown(page: Page, name: string, locator"));
+        waitForProblem("locator,");
+        launch("locator,", "Annotate 'locator' as string");
+        assertTrue(document.getText(), document.getText().contains("locator: string"));
     }
 
     private void open(String path, String anchor, String insert) {
@@ -150,21 +148,32 @@ public class TsDiagnosticsTest extends BasePlatformTestCase {
         PsiDocumentManager.getInstance(getProject()).commitAllDocuments();
     }
 
-    /** Highlights until the server reports a problem starting at {@code needle} (pushed diagnostics come later). */
+    /** Runs the IDE's analysis (with the plugin's annotator) until a TypeScript problem starts at {@code needle}. */
     private HighlightInfo waitForProblem(String needle) {
         int offset = document.getText().indexOf(needle);
         long deadline = System.currentTimeMillis() + 20_000;
+        List<HighlightInfo> infos = List.of();
         while (System.currentTimeMillis() < deadline) {
-            TsSemanticHighlighter.getInstance(getProject()).highlight(myFixture.getFile().getVirtualFile());
-            PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue();
-            List<HighlightInfo> infos = DaemonCodeAnalyzerImpl.getHighlights(document, HighlightSeverity.INFORMATION, getProject());
+            infos = myFixture.doHighlighting();
             for (HighlightInfo info : infos) {
-                if (info.getStartOffset() == offset && info.getDescription() != null && info.getDescription().startsWith("TS")) return info;
+                if (info.getStartOffset() == offset && info.getDescription() != null && info.getDescription().contains("(TS")) return info;
             }
+            // typescript-language-server pushes its diagnostics a moment later
             PlatformTestUtil.waitForAlarm(300);
         }
-        fail("no problem at " + needle + ": " + TsSemanticHighlighter.stats(document) + " "
-                + DaemonCodeAnalyzerImpl.getHighlights(document, HighlightSeverity.INFORMATION, getProject()));
+        fail("no problem at " + needle + ": " + infos);
         return null;
+    }
+
+    private List<String> intentionsAt(String needle) {
+        myFixture.getEditor().getCaretModel().moveToOffset(document.getText().indexOf(needle));
+        return myFixture.getAvailableIntentions().stream().map(IntentionAction::getText).toList();
+    }
+
+    private void launch(String needle, String fix) {
+        myFixture.getEditor().getCaretModel().moveToOffset(document.getText().indexOf(needle));
+        IntentionAction action = myFixture.getAvailableIntentions().stream().filter(i -> i.getText().startsWith(fix)).findFirst().orElse(null);
+        assertNotNull(fix + " in " + intentionsAt(needle), action);
+        myFixture.launchAction(action);
     }
 }

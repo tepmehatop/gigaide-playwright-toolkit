@@ -9,9 +9,13 @@ import java.util.Set;
 public class TsSemanticColorsTest extends BasePlatformTestCase {
     /** GigaIDE registers TS_* keys with JS_* fallbacks; we must reuse them instead of failing. */
     public void testReusesKeysRegisteredWithAnotherFallback() {
-        TextAttributesKey jsKey = TextAttributesKey.createTextAttributesKey("JS_INTERFACE_TEST_FALLBACK",
-                DefaultLanguageHighlighterColors.CLASS_REFERENCE);
-        TextAttributesKey gigaKey = TextAttributesKey.createTextAttributesKey("TS_INTERFACE_NAME", jsKey);
+        // GigaIDE's own highlighting (run by other tests in this JVM) may have registered it already
+        TextAttributesKey gigaKey = TextAttributesKey.find("TS_INTERFACE_NAME");
+        if (gigaKey.getFallbackAttributeKey() == null) {
+            TextAttributesKey jsKey = TextAttributesKey.createTextAttributesKey("JS_INTERFACE_TEST_FALLBACK",
+                    DefaultLanguageHighlighterColors.CLASS_REFERENCE);
+            gigaKey = TextAttributesKey.createTextAttributesKey("TS_INTERFACE_NAME", jsKey);
+        }
         com.intellij.openapi.editor.colors.EditorColorsManager.getInstance().getGlobalScheme().setAttributes(gigaKey,
                 new com.intellij.openapi.editor.markup.TextAttributes(java.awt.Color.RED, null, null, null, java.awt.Font.PLAIN));
 

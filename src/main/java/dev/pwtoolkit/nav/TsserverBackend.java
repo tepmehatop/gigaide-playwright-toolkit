@@ -208,6 +208,57 @@ final class TsserverBackend implements TsBackend {
         });
     }
 
+    @Override
+    public @NotNull CompletableFuture<TsLanguageService.SignatureHelp> signatureHelp(@NotNull Path file, int line, int character) {
+        return request("signatureHelp", Map.of("file", file.toString(), "line", line + 1, "offset", character + 1)).handle((response, error) -> {
+            // "No content available" outside of a call
+            if (error != null || !(response.get("body") instanceof JsonObject body) || !body.has("items")) return TsLanguageService.SignatureHelp.NONE;
+            List<TsLanguageService.Signature> signatures = new ArrayList<>();
+            for (JsonElement element : body.getAsJsonArray("items")) {
+                JsonObject item = element.getAsJsonObject();
+                StringBuilder label = new StringBuilder(parts(item.getAsJsonArray("prefixDisplayParts")));
+                String separator = parts(item.getAsJsonArray("separatorDisplayParts"));
+                List<int[]> parameters = new ArrayList<>();
+                JsonArray params = item.getAsJsonArray("parameters");
+                for (int i = 0; params != null && i < params.size(); i++) {
+                    if (i > 0) label.append(separator);
+                    int start = label.length();
+                    label.append(parts(params.get(i).getAsJsonObject().getAsJsonArray("displayParts")));
+                    parameters.add(new int[]{start, label.length()});
+                }
+                label.append(parts(item.getAsJsonArray("suffixDisplayParts")));
+                signatures.add(new TsLanguageService.Signature(label.toString(), parameters, parts(item.getAsJsonArray("documentation"))));
+            }
+            return new TsLanguageService.SignatureHelp(signatures, body.has("selectedItemIndex") ? body.get("selectedItemIndex").getAsInt() : 0,
+                    body.has("argumentIndex") ? body.get("argumentIndex").getAsInt() : 0);
+        });
+    }
+
+    @Override
+    public @NotNull CompletableFuture<TsLanguageService.QuickInfo> quickInfo(@NotNull Path file, int line, int character) {
+        return request("quickinfo", Map.of("file", file.toString(), "line", line + 1, "offset", character + 1)).handle((response, error) -> {
+            if (error != null || !(response.get("body") instanceof JsonObject body) || !body.has("displayString")) return TsLanguageService.QuickInfo.NONE;
+            JsonElement documentation = body.get("documentation");
+            String doc = documentation == null ? "" : documentation.isJsonArray() ? parts(documentation.getAsJsonArray()) : documentation.getAsString();
+            if (body.has("tags")) {
+                for (JsonElement tag : body.getAsJsonArray("tags")) {
+                    JsonObject t = tag.getAsJsonObject();
+                    JsonElement text = t.get("text");
+                    doc += "\n\n@" + t.get("name").getAsString() + " "
+                            + (text == null ? "" : text.isJsonArray() ? parts(text.getAsJsonArray()) : text.getAsString());
+                }
+            }
+            return new TsLanguageService.QuickInfo(body.get("displayString").getAsString(), doc.strip());
+        });
+    }
+
+    /** SymbolDisplayPart[] -> text. */
+    private static @NotNull String parts(@Nullable JsonArray parts) {
+        StringBuilder text = new StringBuilder();
+        if (parts != null) for (JsonElement part : parts) text.append(part.getAsJsonObject().get("text").getAsString());
+        return text.toString();
+    }
+
     /** FileCodeEdits[]: [{fileName, textChanges: [{start: {line, offset}, end, newText}]}], 1-based. */
     private static @NotNull List<TsLanguageService.Edit> changes(@Nullable JsonArray changes) {
         List<TsLanguageService.Edit> edits = new ArrayList<>();

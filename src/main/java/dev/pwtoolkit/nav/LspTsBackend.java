@@ -81,6 +81,9 @@ final class LspTsBackend implements TsBackend {
                         "completion", Map.of("completionItem", Map.of("snippetSupport", false,
                                 "resolveSupport", Map.of("properties", List.of("additionalTextEdits", "detail"))), "contextSupport", true),
                         "publishDiagnostics", Map.of(),
+                        "signatureHelp", Map.of("signatureInformation", Map.of("parameterInformation", Map.of("labelOffsetSupport", true),
+                                "documentationFormat", List.of("plaintext", "markdown"), "activeParameterSupport", true)),
+                        "hover", Map.of("contentFormat", List.of("markdown", "plaintext")),
                         "diagnostic", Map.of("dynamicRegistration", false),
                         "codeAction", Map.of("codeActionLiteralSupport", Map.of("codeActionKind", Map.of("valueSet", List.of("quickfix")))),
                         "synchronization", Map.of("didSave", false, "dynamicRegistration", false),
@@ -237,6 +240,64 @@ final class LspTsBackend implements TsBackend {
             }
             return fixes;
         });
+    }
+
+    @Override
+    public @NotNull CompletableFuture<TsLanguageService.SignatureHelp> signatureHelp(@NotNull Path file, int line, int character) {
+        Map<String, Object> params = Map.of("textDocument", Map.of("uri", uri(file)), "position", Map.of("line", line, "character", character));
+        return loaded().thenCompose(ignored -> client.request("textDocument/signatureHelp", params)).thenApply(result -> {
+            if (result == null || !result.isJsonObject() || !result.getAsJsonObject().has("signatures")) return TsLanguageService.SignatureHelp.NONE;
+            JsonObject help = result.getAsJsonObject();
+            List<TsLanguageService.Signature> signatures = new ArrayList<>();
+            for (JsonElement element : help.getAsJsonArray("signatures")) {
+                JsonObject signature = element.getAsJsonObject();
+                String label = signature.get("label").getAsString();
+                List<int[]> parameters = new ArrayList<>();
+                int searchFrom = label.indexOf('(') + 1;
+                if (signature.has("parameters")) {
+                    for (JsonElement p : signature.getAsJsonArray("parameters")) {
+                        JsonElement parameterLabel = p.getAsJsonObject().get("label");
+                        if (parameterLabel.isJsonArray()) {
+                            parameters.add(new int[]{parameterLabel.getAsJsonArray().get(0).getAsInt(), parameterLabel.getAsJsonArray().get(1).getAsInt()});
+                        } else {
+                            int start = label.indexOf(parameterLabel.getAsString(), Math.max(searchFrom, 0));
+                            if (start < 0) start = searchFrom;
+                            parameters.add(new int[]{start, start + parameterLabel.getAsString().length()});
+                            searchFrom = start + parameterLabel.getAsString().length();
+                        }
+                    }
+                }
+                signatures.add(new TsLanguageService.Signature(label, parameters, text(signature.get("documentation"))));
+            }
+            int active = help.has("activeSignature") && !help.get("activeSignature").isJsonNull() ? help.get("activeSignature").getAsInt() : 0;
+            int parameter = help.has("activeParameter") && !help.get("activeParameter").isJsonNull() ? help.get("activeParameter").getAsInt() : 0;
+            return new TsLanguageService.SignatureHelp(signatures, active, parameter);
+        });
+    }
+
+    @Override
+    public @NotNull CompletableFuture<TsLanguageService.QuickInfo> quickInfo(@NotNull Path file, int line, int character) {
+        Map<String, Object> params = Map.of("textDocument", Map.of("uri", uri(file)), "position", Map.of("line", line, "character", character));
+        return loaded().thenCompose(ignored -> client.request("textDocument/hover", params)).thenApply(result -> {
+            if (result == null || !result.isJsonObject() || !result.getAsJsonObject().has("contents")) return TsLanguageService.QuickInfo.NONE;
+            JsonElement contents = result.getAsJsonObject().get("contents");
+            StringBuilder markdown = new StringBuilder();
+            if (contents.isJsonArray()) {
+                for (JsonElement part : contents.getAsJsonArray()) markdown.append(part.isJsonObject() && part.getAsJsonObject().has("language")
+                        ? "```\n" + part.getAsJsonObject().get("value").getAsString() + "\n```\n" : text(part)).append('\n');
+            } else {
+                markdown.append(text(contents));
+            }
+            return TsQuickInfoText.fromMarkdown(markdown.toString());
+        });
+    }
+
+    /** A string or a MarkupContent {kind, value}. */
+    private static @NotNull String text(@Nullable JsonElement element) {
+        if (element == null || element.isJsonNull()) return "";
+        if (element.isJsonPrimitive()) return element.getAsString();
+        if (element.isJsonObject() && element.getAsJsonObject().has("value")) return element.getAsJsonObject().get("value").getAsString();
+        return "";
     }
 
     @Override
