@@ -52,7 +52,7 @@ intellijPlatform {
     buildSearchableOptions = false
     instrumentCode = false
     pluginConfiguration {
-        changeNotes = "TypeScript errors with tooltips, light bulb and Alt+Enter fixes (Annotate page as Page, Add import), parameter info, quick documentation on hover. See CHANGELOG.md."
+        changeNotes = "Parameter info on click and after comma, parameter name hints, Find Usages (Alt+F7) and Structure (Cmd+F12) from the TypeScript server. See CHANGELOG.md."
         ideaVersion {
             sinceBuild = "251"
             untilBuild = provider { null }

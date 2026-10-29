@@ -35,6 +35,7 @@ public final class PwConfigurable implements SearchableConfigurable {
     private JBCheckBox semanticHighlighting;
     private JBCheckBox completion;
     private JBCheckBox diagnostics;
+    private JBCheckBox parameterHints;
     private JBCheckBox rainbowBrackets;
     private JBCheckBox showBrowser;
     private JBCheckBox pauseOnFailure;
@@ -70,6 +71,7 @@ public final class PwConfigurable implements SearchableConfigurable {
         semanticHighlighting = new JBCheckBox("Semantic highlighting (fixtures, Page Object fields and methods) from TypeScript");
         completion = new JBCheckBox("Code completion from TypeScript (page., locator., fixtures, Page Objects)");
         diagnostics = new JBCheckBox("TypeScript errors in the editor, with quick fixes (Alt+Enter: Add import...)");
+        parameterHints = new JBCheckBox("Parameter name hints before literal arguments (locator: \"#id\")");
         rainbowBrackets = new JBCheckBox("Rainbow brackets in TS/JS files (color by nesting depth)");
         semanticHighlighting.setToolTipText("Unique colors for parameters and local variables: Settings | Editor | Color Scheme | Language Defaults | Semantic highlighting");
         showBrowser = new JBCheckBox("Show the browser while debugging (--headed)");
@@ -99,6 +101,7 @@ public final class PwConfigurable implements SearchableConfigurable {
                 .addLabeledComponent("Navigation timeout, ms:", navigationTimeout)
                 .addComponent(completion)
                 .addComponent(diagnostics)
+                .addComponent(parameterHints)
                 .addComponent(semanticHighlighting)
                 .addComponent(rainbowBrackets)
                 .addSeparator()
@@ -140,6 +143,7 @@ public final class PwConfigurable implements SearchableConfigurable {
                 || semanticHighlighting.isSelected() != s.semanticHighlighting
                 || completion.isSelected() != s.completion
                 || diagnostics.isSelected() != s.diagnostics
+                || parameterHints.isSelected() != s.parameterHints
                 || rainbowBrackets.isSelected() != s.rainbowBrackets
                 || showBrowser.isSelected() != s.showBrowserWhenDebugging
                 || pauseOnFailure.isSelected() != s.pauseOnFailure
@@ -163,6 +167,7 @@ public final class PwConfigurable implements SearchableConfigurable {
         s.skipPlaywrightInternals = skipInternals.isSelected();
         s.semanticHighlighting = semanticHighlighting.isSelected();
         s.completion = completion.isSelected();
+        s.parameterHints = parameterHints.isSelected();
         boolean diagnosticsChanged = s.diagnostics != diagnostics.isSelected();
         s.diagnostics = diagnostics.isSelected();
         if (diagnosticsChanged) {
@@ -204,6 +209,7 @@ public final class PwConfigurable implements SearchableConfigurable {
         semanticHighlighting.setSelected(s.semanticHighlighting);
         completion.setSelected(s.completion);
         diagnostics.setSelected(s.diagnostics);
+        parameterHints.setSelected(s.parameterHints);
         rainbowBrackets.setSelected(s.rainbowBrackets);
         showBrowser.setSelected(s.showBrowserWhenDebugging);
         pauseOnFailure.setSelected(s.pauseOnFailure);
