@@ -70,6 +70,21 @@ public class TsNavigationTest extends BasePlatformTestCase {
         assertDefinition("tests/baseTest.ts", "LoginPage(page)", "loginPage.page.ts", 2);
     }
 
+    /** Playwright API methods used in a Page Object: the target is in node_modules/playwright-core/types/types.d.ts (1 MB+). */
+    public void testPlaywrightApiMethodInPageObject() throws Exception {
+        assertDefinition("pages/loginPage.page.ts", "fill(this.selectors.loginInput", "types.d.ts", -1);
+        assertDefinition("pages/loginPage.page.ts", "innerText();", "types.d.ts", -1);
+        assertDefinition("pages/loginPage.page.ts", "waitForResponse(", "types.d.ts", -1);
+        VirtualFile file = sample.findFileByRelativePath("pages/loginPage.page.ts");
+        myFixture.configureFromExistingVirtualFile(file);
+        int offset = myFixture.getEditor().getDocument().getText().indexOf("fill(this.selectors.loginInput");
+        com.intellij.psi.PsiElement source = myFixture.getFile().findElementAt(offset);
+        com.intellij.psi.PsiElement[] targets = new TsGotoDeclarationHandler().getGotoDeclarationTargets(source, offset, myFixture.getEditor());
+        assertNotNull("Ctrl+Click on page.fill finds nothing", targets);
+        assertEquals("types.d.ts", targets[0].getContainingFile().getName());
+        assertTrue(targets[0].getText(), targets[0].getText().startsWith("fill"));
+    }
+
     /** The exact case from the bug report: a property of a local object literal, in an unsaved editor. */
     public void testUnsavedLocalObjectProperty() throws Exception {
         VirtualFile file = sample.findFileByRelativePath("tests/login/login.test.ts");
@@ -129,6 +144,6 @@ public class TsNavigationTest extends BasePlatformTestCase {
         assertFalse("no definition for " + needle, locations.isEmpty());
         TsLanguageService.Location location = locations.get(0);
         assertEquals(locations.toString(), expectedFile, location.file().getFileName().toString());
-        assertEquals(locations.toString(), expectedLine, location.line());
+        if (expectedLine >= 0) assertEquals(locations.toString(), expectedLine, location.line());
     }
 }

@@ -27,6 +27,9 @@ interface TsBackend {
     @NotNull CompletableFuture<List<TsLanguageService.SemanticToken>> semanticTokens(@NotNull Path file, @NotNull CharSequence text);
 
     /** Files changed on disk (created 1, changed 2, deleted 3). */
+    /** Completion at a 0-based position; trigger is "." when the user just typed it. */
+    @NotNull CompletableFuture<List<TsLanguageService.Completion>> completions(@NotNull Path file, int line, int character, @Nullable String trigger);
+
     void filesChanged(@NotNull List<Path> files, @NotNull List<Integer> types);
 
     boolean isAlive();

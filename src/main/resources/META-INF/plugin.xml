@@ -6,8 +6,10 @@
     Tools for writing Playwright tests in TypeScript/JavaScript in GigaIDE (and other IntelliJ-based IDEs without
     the commercial JavaScript plugin):
     <ul>
-      <li><b>Go to Declaration</b> (Ctrl/Cmd+Click) for TS/JS resolved by the native TypeScript 7 language server:
+      <li><b>Go to Declaration</b> (Ctrl/Cmd+Click) for TS/JS resolved by the TypeScript language server (native TypeScript 7, or tsserver.js / typescript-language-server on Node.js):
           fixtures from <code>test.extend</code>, Page Object methods and fields, local object properties, imports, JSON.</li>
+      <li><b>Code completion</b> from the TypeScript server: members of <code>page</code>, locators, fixtures and Page Objects;
+          <code>log</code> and <code>.log</code> templates for <code>console.log</code>.</li>
       <li><b>Playwright Test</b> run configuration with Run/Debug gutter icons next to <code>test(...)</code> and
           <code>test.describe(...)</code>.</li>
       <li><b>Test tree</b> in Run and Debug: statuses, clickable stacks and attachments, expected/actual diff,
@@ -23,6 +25,11 @@
 
     <extensions defaultExtensionNs="com.intellij">
         <gotoDeclarationHandler implementation="dev.pwtoolkit.nav.TsGotoDeclarationHandler" order="first"/>
+        <completion.contributor language="any" implementationClass="dev.pwtoolkit.completion.TsCompletionContributor" order="first"/>
+        <typedHandler implementation="dev.pwtoolkit.completion.TsAutoPopupHandler"/>
+        <codeInsight.template.postfixTemplateProvider language="TypeScript" implementationClass="dev.pwtoolkit.completion.TsPostfixTemplateProvider"/>
+        <codeInsight.template.postfixTemplateProvider language="JavaScript" implementationClass="dev.pwtoolkit.completion.TsPostfixTemplateProvider"/>
+        <codeInsight.template.postfixTemplateProvider language="TSX" implementationClass="dev.pwtoolkit.completion.TsPostfixTemplateProvider"/>
 
         <configurationType implementation="dev.pwtoolkit.run.PwRunConfigurationType"/>
         <runConfigurationProducer implementation="dev.pwtoolkit.run.PwConfigurationProducer"/>

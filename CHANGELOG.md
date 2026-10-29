@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.0
+
+- **Автодополнение от TypeScript-сервера**: после `page.`, `locator.`, фикстуры или Page Object — методы и свойства Playwright (`waitForResponse`, `waitForTimeout`, `innerText`…), ключевые слова (`await`) и глобальные имена (`console`). JS-плагин GigaIDE не знает типов из `node_modules`, поэтому сам ничего не предлагает. Список открывается после `.`, у методов добавляются скобки. Работает со всеми тремя серверами (TS 7, `tsserver.js`, typescript-language-server); отключается в настройках (*Code completion from TypeScript*).
+- **`log` + Tab** → `console.log();` и постфиксные **`.log`** / **`.error`** + Tab: `page.url().log` → `console.log(page.url())`.
+- Diagnose Highlighting: строка `goto '<слово под курсором>'` — что сервер ответил на Ctrl+Click, за сколько миллисекунд и смогла ли IDE открыть цель.
+
 ## 1.4.0
 
 - **TypeScript-сервер на Node.js** — для машин, где политика безопасности запрещает запускать нативные бинарники (`Exec failed, error=1 (Операция не позволена)`, SberOS). Навигация и подсветка работают на TypeScript 5/6 из `node_modules` проекта, ставить TypeScript 7 не нужно.

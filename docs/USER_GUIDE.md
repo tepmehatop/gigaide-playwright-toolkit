@@ -5,7 +5,7 @@
 ## Содержание
 
 1. [Установка и проверка окружения](#1-установка-и-проверка-окружения)
-2. [Навигация и подсветка кода](#2-навигация-и-подсветка-кода)
+2. [Навигация, подсветка и автодополнение](#2-навигация-подсветка-и-автодополнение)
 3. [Запуск тестов](#3-запуск-тестов)
 4. [Дерево тестов и результаты](#4-дерево-тестов-и-результаты)
 5. [Параметры прогона](#5-параметры-прогона)
@@ -38,12 +38,15 @@ Project: ~/projects/autotests
 
 Строка с ✗ подсказывает, что сделать: например, браузеры ставятся через **Tools → Playwright → Install Browsers**.
 
-## 2. Навигация и подсветка кода
+## 2. Навигация, подсветка и автодополнение
 
 **Переход к объявлению** — Cmd+Click (Ctrl+Click) или Cmd+B на любом идентификаторе в `.ts`/`.js`:
 - фикстура в `async ({ page, mainPage }) => …` → её объявление в `tests/baseTest.ts`;
 - `mainPage.open()`, `header.selectors.logo` → метод или поле Page Object;
-- свойства локальных объектов, импорты, значения в JSON.
+- свойства локальных объектов, импорты, значения в JSON;
+- методы самого Playwright (`page.locator`, `page.fill`, `page.waitForResponse`, `locator.innerText`…) — в `types.d.ts` из `node_modules`.
+
+**Автодополнение** (Ctrl+Space, после `.` открывается само): члены `page.`, `locator.`, фикстур и Page Object, ключевые слова (`await`, `const`), глобальные имена (`console`). Варианты даёт тот же TypeScript-сервер, что и переходы. У методов сразу добавляются скобки, курсор ставится внутрь.
 
 **Подсветка** работает в тестах так же, как в WebStorm (на снимке — тема Darcula):
 
@@ -223,7 +226,11 @@ Tools
 | `pwfix` | фикстура для `test.extend`: `mainPage: async ({ page }, use) => { await use(new MainPage(page)) },` |
 | `pwpage` | класс Page Object в стиле проекта: `path`, `selectors`, конструктор, `open()` |
 
-Шаблоны можно поменять: **Settings → Editor → Live Templates → Playwright**.
+| `log` | `console.log(…);` |
+
+**Постфиксные шаблоны**: допишите к выражению `.log` (или `.error`) и нажмите **Tab** — `page.url().log` превращается в `console.log(page.url())`.
+
+Шаблоны можно поменять: **Settings → Editor → Live Templates → Playwright**; постфиксные — **Settings → Editor → General → Postfix Completion**.
 
 ## 11. Настройки
 
@@ -236,6 +243,7 @@ Tools
 | Пути к Node.js, TypeScript (tsc/tsgo TS 7 или tsserver.js TS 5/6), vscode-js-debug | пусто — ищутся автоматически (найденный путь показан под полем) |
 | TypeScript server: Auto / Native TypeScript 7 / tsserver.js / typescript-language-server | значение сборки (auto, tsserver или tsls) |
 | Go to Declaration через TypeScript-сервер | вкл. |
+| Code completion from TypeScript | вкл. |
 | Semantic highlighting, Rainbow brackets | вкл. |
 | Не заходить в код Playwright при step into | вкл. |
 | Show browser and keep it open between runs | выкл. |
@@ -248,6 +256,7 @@ Tools
 
 | Симптом | Причина и решение |
 |---|---|
+| Ctrl+Click по методу не работает | Курсор на метод → **Tools → Playwright → Diagnose Highlighting**, строка `goto '…'`: `server found nothing` — TypeScript не знает тип (например, переменная типа `any`); `SLOWER THAN TIMEOUT` — увеличьте Navigation timeout в настройках; `IDE CANNOT OPEN` — IDE не может открыть файл с объявлением |
 | «Cannot find declaration to go», нет подсветки | Нет TypeScript в `node_modules` проекта: добавьте `typescript` в `devDependencies`. Проверка: Tools → Playwright → Check Environment |
 | Diagnose Highlighting: `Exec failed, error=1 (Операция не позволена)` | Политика ОС запрещает запускать нативный TypeScript 7. Выберите в **Settings → Tools → Playwright Toolkit → TypeScript server** вариант *tsserver.js via Node.js* или *typescript-language-server* (или поставьте сборку `-tsserver`/`-tsls`). Нужен TypeScript 5/6 в `node_modules` проекта |
 | У теста два значка ▶, второй даёт «tsx binary not found» | Второй значок — от плагина NodeJS GigaIDE (запуск через node:test). Плагин его скрывает в Playwright-тестах; перезапустите IDE после установки |

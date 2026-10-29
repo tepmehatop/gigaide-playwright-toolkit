@@ -27,7 +27,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 /**
- * Ctrl+Click / Go to Declaration for TypeScript and JavaScript, answered by the TypeScript 7 language server.
+ * Ctrl+Click / Go to Declaration for TypeScript and JavaScript, answered by the TypeScript language server.
  * Registered with order="first"; returns null when the server has no answer, so the IDE's own handlers still run.
  */
 public final class TsGotoDeclarationHandler implements GotoDeclarationHandler {
@@ -78,7 +78,7 @@ public final class TsGotoDeclarationHandler implements GotoDeclarationHandler {
         }
     }
 
-    private static @Nullable PsiElement toElement(Project project, TsLanguageService.Location location) {
+    static @Nullable PsiElement toElement(Project project, TsLanguageService.Location location) {
         VirtualFile file = LocalFileSystem.getInstance().findFileByNioFile(location.file());
         if (file == null) return null;
         Document document = FileDocumentManager.getInstance().getDocument(file);

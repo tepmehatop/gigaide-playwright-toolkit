@@ -122,6 +122,47 @@ final class TsserverBackend implements TsBackend {
     }
 
     @Override
+    public @NotNull CompletableFuture<List<TsLanguageService.Completion>> completions(@NotNull Path file, int line, int character,
+                                                                                      @Nullable String trigger) {
+        Map<String, Object> arguments = new java.util.HashMap<>(Map.of("file", file.toString(), "line", line + 1, "offset", character + 1,
+                "includeExternalModuleExports", false, "includeInsertTextCompletions", true));
+        if (trigger != null) arguments.put("triggerCharacter", trigger);
+        return request("completionInfo", arguments).thenApply(response -> {
+            List<TsLanguageService.Completion> completions = new ArrayList<>();
+            JsonObject body = response.has("body") && response.get("body").isJsonObject() ? response.getAsJsonObject("body") : null;
+            JsonArray entries = body == null ? null : body.getAsJsonArray("entries");
+            if (entries == null) return completions;
+            for (JsonElement element : entries) {
+                JsonObject entry = element.getAsJsonObject();
+                String name = entry.get("name").getAsString();
+                completions.add(new TsLanguageService.Completion(name, completionKind(entry.has("kind") ? entry.get("kind").getAsString() : ""),
+                        entry.has("sortText") ? entry.get("sortText").getAsString() : name,
+                        entry.has("insertText") ? entry.get("insertText").getAsString() : null));
+            }
+            return completions;
+        });
+    }
+
+    /** TypeScript's ScriptElementKind to our kind names. */
+    private static @NotNull String completionKind(@NotNull String kind) {
+        return switch (kind) {
+            case "method", "construct", "call", "index", "constructor" -> "method";
+            case "function", "local function" -> "function";
+            case "property", "getter", "setter", "accessor" -> "property";
+            case "var", "let", "local var", "parameter", "alias", "using", "await using" -> "variable";
+            case "const" -> "constant";
+            case "class", "local class" -> "class";
+            case "interface", "type" -> "interface";
+            case "enum" -> "enum";
+            case "enum member" -> "enumMember";
+            case "module", "external module name", "directory", "script" -> "module";
+            case "keyword" -> "keyword";
+            case "type parameter" -> "typeParameter";
+            default -> "other";
+        };
+    }
+
+    @Override
     public void filesChanged(@NotNull List<Path> files, @NotNull List<Integer> types) {
         // tsserver watches the project files itself
     }

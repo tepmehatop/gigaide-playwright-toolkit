@@ -33,6 +33,7 @@ public final class PwConfigurable implements SearchableConfigurable {
     private JSpinner navigationTimeout;
     private JBCheckBox skipInternals;
     private JBCheckBox semanticHighlighting;
+    private JBCheckBox completion;
     private JBCheckBox rainbowBrackets;
     private JBCheckBox showBrowser;
     private JBCheckBox pauseOnFailure;
@@ -66,6 +67,7 @@ public final class PwConfigurable implements SearchableConfigurable {
         navigationTimeout = new JSpinner(new SpinnerNumberModel(3000, 200, 60000, 100));
         skipInternals = new JBCheckBox("Do not step into Playwright internals (node_modules/playwright*)");
         semanticHighlighting = new JBCheckBox("Semantic highlighting (fixtures, Page Object fields and methods) from TypeScript");
+        completion = new JBCheckBox("Code completion from TypeScript (page., locator., fixtures, Page Objects)");
         rainbowBrackets = new JBCheckBox("Rainbow brackets in TS/JS files (color by nesting depth)");
         semanticHighlighting.setToolTipText("Unique colors for parameters and local variables: Settings | Editor | Color Scheme | Language Defaults | Semantic highlighting");
         showBrowser = new JBCheckBox("Show the browser while debugging (--headed)");
@@ -93,6 +95,7 @@ public final class PwConfigurable implements SearchableConfigurable {
                 .addLabeledComponent("TypeScript 7 tsc/tsgo or tsserver.js:", tsServerPath)
                 .addComponentToRightColumn(hint("Default: found in node_modules of the project"))
                 .addLabeledComponent("Navigation timeout, ms:", navigationTimeout)
+                .addComponent(completion)
                 .addComponent(semanticHighlighting)
                 .addComponent(rainbowBrackets)
                 .addSeparator()
@@ -132,6 +135,7 @@ public final class PwConfigurable implements SearchableConfigurable {
                 || (Integer) navigationTimeout.getValue() != s.navigationTimeoutMs
                 || skipInternals.isSelected() != s.skipPlaywrightInternals
                 || semanticHighlighting.isSelected() != s.semanticHighlighting
+                || completion.isSelected() != s.completion
                 || rainbowBrackets.isSelected() != s.rainbowBrackets
                 || showBrowser.isSelected() != s.showBrowserWhenDebugging
                 || pauseOnFailure.isSelected() != s.pauseOnFailure
@@ -154,6 +158,7 @@ public final class PwConfigurable implements SearchableConfigurable {
         s.navigationTimeoutMs = (Integer) navigationTimeout.getValue();
         s.skipPlaywrightInternals = skipInternals.isSelected();
         s.semanticHighlighting = semanticHighlighting.isSelected();
+        s.completion = completion.isSelected();
         s.rainbowBrackets = rainbowBrackets.isSelected();
         s.showBrowserWhenDebugging = showBrowser.isSelected();
         s.pauseOnFailure = pauseOnFailure.isSelected();
@@ -188,6 +193,7 @@ public final class PwConfigurable implements SearchableConfigurable {
         navigationTimeout.setValue(s.navigationTimeoutMs);
         skipInternals.setSelected(s.skipPlaywrightInternals);
         semanticHighlighting.setSelected(s.semanticHighlighting);
+        completion.setSelected(s.completion);
         rainbowBrackets.setSelected(s.rainbowBrackets);
         showBrowser.setSelected(s.showBrowserWhenDebugging);
         pauseOnFailure.setSelected(s.pauseOnFailure);

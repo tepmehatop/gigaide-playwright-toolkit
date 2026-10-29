@@ -72,8 +72,10 @@ public final class HighlightingDiagnosticsAction extends AnAction {
         rows.sort(Comparator.comparingInt(r -> Integer.parseInt(r[0])));
         for (String[] row : rows) details.append(row[1]).append('\n');
 
+        int caret = editor.getCaretModel().getOffset();
         com.intellij.openapi.application.ApplicationManager.getApplication().executeOnPooledThread(() -> {
             List<String> summary = summary(project, file, document, line + 1, lineText, scheme);
+            if (file != null) summary.add(2, gotoAtCaret(project, file, document, caret));
             String report = "[pwtoolkit] highlighting diagnostics\nSUMMARY\n" + String.join("\n", summary) + "\nDETAILS\n" + details;
             LOG.info(report);
             com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater(() -> {
@@ -108,6 +110,35 @@ public final class HighlightingDiagnosticsAction extends AnAction {
         lines.add("scheme: " + scheme.getName() + " | semantic=" + PwSettings.getInstance().getState().semanticHighlighting
                 + " brackets=" + PwSettings.getInstance().getState().rainbowBrackets);
         return lines;
+    }
+
+    /** Ctrl+Click on the word at the caret: what the server answers and what the IDE gets from it. */
+    static String gotoAtCaret(Project project, com.intellij.openapi.vfs.VirtualFile file, Document document, int caret) {
+        CharSequence text = document.getImmutableCharSequence();
+        int start = caret;
+        int end = caret;
+        while (start > 0 && Character.isJavaIdentifierPart(text.charAt(start - 1))) start--;
+        while (end < text.length() && Character.isJavaIdentifierPart(text.charAt(end))) end++;
+        String word = text.subSequence(start, end).toString();
+        long started = System.currentTimeMillis();
+        try {
+            java.util.concurrent.CompletableFuture<List<TsLanguageService.Location>> future = com.intellij.openapi.application.ApplicationManager.getApplication()
+                    .runReadAction((com.intellij.openapi.util.Computable<java.util.concurrent.CompletableFuture<List<TsLanguageService.Location>>>)
+                            () -> TsLanguageService.getInstance(project).definition(file, document, caret));
+            if (future == null) return "goto '" + word + "': no TypeScript server";
+            List<TsLanguageService.Location> locations = future.get(30, java.util.concurrent.TimeUnit.SECONDS);
+            long ms = System.currentTimeMillis() - started;
+            if (locations.isEmpty()) return "goto '" + word + "': server found nothing (" + ms + " ms)";
+            TsLanguageService.Location first = locations.get(0);
+            com.intellij.psi.PsiElement target = com.intellij.openapi.application.ApplicationManager.getApplication()
+                    .runReadAction((com.intellij.openapi.util.Computable<com.intellij.psi.PsiElement>) () -> TsGotoDeclarationHandler.toElement(project, first));
+            String where = first.file().getFileName() + ":" + (first.line() + 1);
+            return "goto '" + word + "': " + locations.size() + " target(s), " + where + ", " + ms + " ms"
+                    + (ms > PwSettings.getInstance().getState().navigationTimeoutMs ? " SLOWER THAN TIMEOUT" : "")
+                    + (target == null ? ", IDE CANNOT OPEN " + first.file() : "");
+        } catch (Exception e) {
+            return "goto '" + word + "': failed " + e;
+        }
     }
 
     /** {@code <tsc> --version}: shows "Permission denied", missing libraries, wrong architecture... */
