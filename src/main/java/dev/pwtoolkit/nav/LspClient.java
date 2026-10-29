@@ -56,6 +56,13 @@ final class LspClient {
         return new LspClient(process, workDir.getName());
     }
 
+    /** Answers to workspace/configuration by section (null: no settings). */
+    private volatile java.util.function.Function<String, JsonElement> configuration = section -> JsonNull.INSTANCE;
+
+    void onConfiguration(@NotNull java.util.function.Function<String, JsonElement> configuration) {
+        this.configuration = configuration;
+    }
+
     void onNotification(@NotNull java.util.function.BiConsumer<String, JsonElement> listener) {
         this.notificationListener = listener;
     }
@@ -189,13 +196,17 @@ final class LspClient {
         }
     }
 
-    /** The server asks the client for things like configuration; we have nothing special to say. */
+    /** The server asks the client for things like configuration. */
     private void answerServerRequest(@NotNull JsonElement id, @NotNull String method, @Nullable JsonElement params) {
         JsonElement result = JsonNull.INSTANCE;
         if ("workspace/configuration".equals(method) && params != null && params.isJsonObject()) {
             JsonArray items = params.getAsJsonObject().getAsJsonArray("items");
             JsonArray answer = new JsonArray();
-            for (int i = 0; items != null && i < items.size(); i++) answer.add(JsonNull.INSTANCE);
+            for (int i = 0; items != null && i < items.size(); i++) {
+                JsonObject item = items.get(i).getAsJsonObject();
+                JsonElement value = configuration.apply(item.has("section") ? item.get("section").getAsString() : "");
+                answer.add(value == null ? JsonNull.INSTANCE : value);
+            }
             result = answer;
         }
         JsonObject response = new JsonObject();

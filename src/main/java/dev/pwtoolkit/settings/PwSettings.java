@@ -30,6 +30,8 @@ public final class PwSettings implements PersistentStateComponent<PwSettings.Sta
         public boolean completion = true;
         /** TypeScript errors and warnings in the editor, with quick fixes (Add import...). */
         public boolean diagnostics = true;
+        /** Parameter name hints before literal arguments: selectFromDropDown(page, locator: "#a"). */
+        public boolean parameterHints = true;
         public boolean showBrowserWhenDebugging = true;
         public boolean pauseOnFailure = true;
         public boolean disableGigaJestMarker = true;

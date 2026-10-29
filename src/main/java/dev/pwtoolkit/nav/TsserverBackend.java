@@ -58,8 +58,10 @@ final class TsserverBackend implements TsBackend {
         this.out = process.getOutputStream();
         startThread("reader", this::readLoop);
         startThread("stderr", this::drainStderr);
-        this.ready = request("configure", Map.of("preferences", Map.of("includeCompletionsForModuleExports", true,
-                "includeCompletionsWithInsertText", true)));
+        Map<String, Object> preferences = new java.util.HashMap<>(LspTsBackend.INLAY_PREFERENCES);
+        preferences.put("includeCompletionsForModuleExports", true);
+        preferences.put("includeCompletionsWithInsertText", true);
+        this.ready = request("configure", Map.of("preferences", preferences));
     }
 
     @Override
@@ -249,6 +251,77 @@ final class TsserverBackend implements TsBackend {
                 }
             }
             return new TsLanguageService.QuickInfo(body.get("displayString").getAsString(), doc.strip());
+        });
+    }
+
+    @Override
+    public @NotNull CompletableFuture<List<TsLanguageService.Reference>> references(@NotNull Path file, int line, int character) {
+        return request("references", Map.of("file", file.toString(), "line", line + 1, "offset", character + 1)).handle((response, error) -> {
+            List<TsLanguageService.Reference> references = new ArrayList<>();
+            if (error != null || !(response.get("body") instanceof JsonObject body) || !body.has("refs")) return references;
+            for (JsonElement element : body.getAsJsonArray("refs")) {
+                JsonObject ref = element.getAsJsonObject();
+                references.add(new TsLanguageService.Reference(Path.of(ref.get("file").getAsString()), span(ref),
+                        ref.has("isDefinition") && ref.get("isDefinition").getAsBoolean()));
+            }
+            return references;
+        });
+    }
+
+    @Override
+    public @NotNull CompletableFuture<List<TsLanguageService.Symbol>> symbols(@NotNull Path file) {
+        return request("navtree", Map.of("file", file.toString())).handle((response, error) -> {
+            if (error != null || !(response.get("body") instanceof JsonObject root)) return List.of();
+            // the root item is the module itself
+            return root.has("childItems") ? navTree(root.getAsJsonArray("childItems")) : List.of();
+        });
+    }
+
+    private static @NotNull List<TsLanguageService.Symbol> navTree(@NotNull JsonArray items) {
+        List<TsLanguageService.Symbol> result = new ArrayList<>();
+        for (JsonElement element : items) {
+            JsonObject item = element.getAsJsonObject();
+            JsonArray spans = item.getAsJsonArray("spans");
+            if (spans == null || spans.isEmpty()) continue;
+            TsLanguageService.Range range = span(spans.get(0).getAsJsonObject());
+            TsLanguageService.Range selection = item.has("nameSpan") && item.get("nameSpan").isJsonObject() ? span(item.getAsJsonObject("nameSpan")) : range;
+            List<TsLanguageService.Symbol> children = item.has("childItems") ? navTree(item.getAsJsonArray("childItems")) : List.of();
+            result.add(new TsLanguageService.Symbol(item.get("text").getAsString(), symbolKind(item.get("kind").getAsString()), range, selection, children));
+        }
+        return result;
+    }
+
+    private static @NotNull String symbolKind(@NotNull String kind) {
+        String normalized = completionKind(kind);
+        return normalized.equals("word") ? "other" : normalized;
+    }
+
+    /** {start: {line, offset}, end: {line, offset}}, 1-based. */
+    private static @NotNull TsLanguageService.Range span(@NotNull JsonObject span) {
+        JsonObject start = span.getAsJsonObject("start");
+        JsonObject end = span.getAsJsonObject("end");
+        return new TsLanguageService.Range(start.get("line").getAsInt() - 1, start.get("offset").getAsInt() - 1,
+                end.get("line").getAsInt() - 1, end.get("offset").getAsInt() - 1);
+    }
+
+    @Override
+    public @NotNull CompletableFuture<List<TsLanguageService.InlayHint>> inlayHints(@NotNull Path file, @NotNull CharSequence text) {
+        int[] lineStarts = LspTsBackend.lineStarts(text);
+        return request("provideInlayHints", Map.of("file", file.toString(), "start", 0, "length", text.length())).handle((response, error) -> {
+            List<TsLanguageService.InlayHint> hints = new ArrayList<>();
+            if (error != null || response.get("body") == null || !response.get("body").isJsonArray()) return hints;
+            for (JsonElement element : response.getAsJsonArray("body")) {
+                JsonObject hint = element.getAsJsonObject();
+                if (!"Parameter".equals(hint.has("kind") ? hint.get("kind").getAsString() : null)) continue;
+                JsonObject position = hint.getAsJsonObject("position");
+                int line = position.get("line").getAsInt() - 1;
+                if (line < 0 || line >= lineStarts.length) continue;
+                JsonElement label = hint.get("text");
+                String value = label.isJsonArray() ? parts(label.getAsJsonArray()) : label.getAsString();
+                if (value.isEmpty() && hint.has("displayParts")) value = parts(hint.getAsJsonArray("displayParts"));
+                hints.add(new TsLanguageService.InlayHint(lineStarts[line] + position.get("offset").getAsInt() - 1, value.strip()));
+            }
+            return hints;
         });
     }
 

@@ -9,7 +9,7 @@ import dev.pwtoolkit.settings.PwSettings;
 import dev.pwtoolkit.util.JsFiles;
 import org.jetbrains.annotations.NotNull;
 
-/** Opens the completion popup after "page." and parameter info after "(" like in VS Code / WebStorm. */
+/** Opens the completion popup after "page." and parameter info after "(" and "," like in VS Code / WebStorm. */
 public final class TsAutoPopupHandler extends TypedHandlerDelegate {
     @Override
     public @NotNull Result checkAutoPopup(char charTyped, @NotNull Project project, @NotNull Editor editor, @NotNull PsiFile file) {
@@ -17,9 +17,10 @@ public final class TsAutoPopupHandler extends TypedHandlerDelegate {
                 && JsFiles.isScript(file.getOriginalFile().getVirtualFile())) {
             AutoPopupController.getInstance(project).scheduleAutoPopup(editor);
         }
-        if (charTyped == '(' && PwSettings.getInstance().getState().completion
+        if ((charTyped == '(' || charTyped == ',') && PwSettings.getInstance().getState().completion
                 && JsFiles.isScript(file.getOriginalFile().getVirtualFile())) {
-            AutoPopupController.getInstance(project).autoPopupParameterInfo(editor, null);
+            // after "," too: the hint comes back with the next parameter if it was closed
+            TsParameterInfoAutoPopup.getInstance(project).showSoon(editor);
         }
         return Result.CONTINUE;
     }

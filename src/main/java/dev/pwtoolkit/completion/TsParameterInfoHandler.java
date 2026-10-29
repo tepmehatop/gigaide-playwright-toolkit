@@ -22,7 +22,8 @@ import java.util.concurrent.TimeoutException;
 /**
  * Parameter info (Ctrl+P / Cmd+P, and on typing "("): the signatures of the call from the TypeScript server, e.g.
  * {@code selectFromDropDown(page: Page, name: string, locator: string)} with the current parameter in bold.
- * The owner is the "(" of the call; the current parameter is counted locally from the commas.
+ * The owner is the "(" of the call; the current parameter is counted locally from the commas. The hint stays while
+ * the caret is inside that call, also after the file is reparsed (typing replaces the PSI leaves).
  */
 public final class TsParameterInfoHandler implements ParameterInfoHandler<PsiElement, TsLanguageService.Signature> {
     private static final long TIMEOUT_MS = 2000;
@@ -50,16 +51,18 @@ public final class TsParameterInfoHandler implements ParameterInfoHandler<PsiEle
 
     @Override
     public @Nullable PsiElement findElementForUpdatingParameterInfo(@NotNull UpdateParameterInfoContext context) {
-        PsiElement owner = context.getParameterOwner();
-        if (owner == null || !owner.isValid()) return null;
         int paren = CallScanner.openParen(context.getEditor().getDocument().getImmutableCharSequence(), context.getOffset());
-        return paren == owner.getTextRange().getStartOffset() ? owner : null;
+        if (paren < 0 || paren + 1 != context.getParameterListStart()) return null;
+        PsiElement owner = context.getParameterOwner();
+        if (owner != null && owner.isValid() && owner.getTextRange().getStartOffset() == paren) return owner;
+        PsiElement fresh = context.getFile().findElementAt(paren);
+        return fresh != null ? fresh : owner;
     }
 
     @Override
     public void updateParameterInfo(@NotNull PsiElement owner, @NotNull UpdateParameterInfoContext context) {
         CharSequence text = context.getEditor().getDocument().getImmutableCharSequence();
-        context.setCurrentParameter(CallScanner.argumentIndex(text, owner.getTextRange().getStartOffset(), context.getOffset()));
+        context.setCurrentParameter(CallScanner.argumentIndex(text, context.getParameterListStart() - 1, context.getOffset()));
     }
 
     @Override

@@ -38,6 +38,17 @@ final class LspTsBackend implements TsBackend {
     private volatile java.util.function.Consumer<Path> diagnosticsListener = path -> {
     };
 
+    /** Parameter name hints like IntelliJ: before literals only, not when the argument has the parameter's name. */
+    static final Map<String, Object> INLAY_PREFERENCES = Map.of("includeInlayParameterNameHints", "literals",
+            "includeInlayParameterNameHintsWhenArgumentMatchesName", false);
+
+    /** The same in the settings format of VS Code / TypeScript 7 ("typescript.inlayHints.parameterNames.enabled"). */
+    private static @NotNull JsonElement languageSettings() {
+        Map<String, Object> inlayHints = new HashMap<>(INLAY_PREFERENCES);
+        inlayHints.put("parameterNames", Map.of("enabled", "literals", "suppressWhenArgumentMatchesName", true));
+        return new com.google.gson.Gson().toJsonTree(Map.of("inlayHints", inlayHints));
+    }
+
     static @NotNull LspTsBackend nativeServer(@NotNull Path root, @NotNull Path exe) throws Exception {
         LspTsBackend backend = new LspTsBackend(root, List.of(exe.toString(), "--lsp", "--stdio"), null, "native TypeScript 7: " + exe);
         backend.projectLoaded.complete(null);
@@ -47,7 +58,7 @@ final class LspTsBackend implements TsBackend {
     static @NotNull LspTsBackend typescriptLanguageServer(@NotNull Path root, @NotNull String node, @NotNull Path cli,
                                                           @NotNull TsServerLocator.Tsserver tsserver) throws Exception {
         Map<String, Object> options = Map.of("tsserver", Map.of("path", tsserver.path().toString()),
-                "hostInfo", "playwright-toolkit", "disableAutomaticTypingAcquisition", true);
+                "hostInfo", "playwright-toolkit", "disableAutomaticTypingAcquisition", true, "preferences", INLAY_PREFERENCES);
         return new LspTsBackend(root, List.of(node, cli.toString(), "--stdio"), options,
                 "typescript-language-server + TypeScript " + tsserver.version() + " via node: " + tsserver.path());
     }
@@ -56,6 +67,8 @@ final class LspTsBackend implements TsBackend {
                          @NotNull String description) throws Exception {
         this.description = description;
         this.client = LspClient.start(command, root.toFile());
+        JsonElement settings = languageSettings();
+        client.onConfiguration(section -> section.equals("typescript") || section.equals("javascript") || section.equals("js/ts") ? settings : null);
         client.onNotification((method, params) -> {
             // diagnostics come after the semantic check, i.e. with the project loaded
             if ("textDocument/publishDiagnostics".equals(method)) {
@@ -77,20 +90,24 @@ final class LspTsBackend implements TsBackend {
         });
         String rootUri = root.toUri().toString();
         Map<String, Object> capabilities = Map.of(
-                "textDocument", Map.of("definition", Map.of("linkSupport", true),
-                        "completion", Map.of("completionItem", Map.of("snippetSupport", false,
-                                "resolveSupport", Map.of("properties", List.of("additionalTextEdits", "detail"))), "contextSupport", true),
-                        "publishDiagnostics", Map.of(),
-                        "signatureHelp", Map.of("signatureInformation", Map.of("parameterInformation", Map.of("labelOffsetSupport", true),
-                                "documentationFormat", List.of("plaintext", "markdown"), "activeParameterSupport", true)),
-                        "hover", Map.of("contentFormat", List.of("markdown", "plaintext")),
-                        "diagnostic", Map.of("dynamicRegistration", false),
-                        "codeAction", Map.of("codeActionLiteralSupport", Map.of("codeActionKind", Map.of("valueSet", List.of("quickfix")))),
-                        "synchronization", Map.of("didSave", false, "dynamicRegistration", false),
-                        "semanticTokens", Map.of("requests", Map.of("full", true), "formats", List.of("relative"),
+                "textDocument", Map.ofEntries(
+                        Map.entry("definition", Map.of("linkSupport", true)),
+                        Map.entry("completion", Map.of("completionItem", Map.of("snippetSupport", false,
+                                "resolveSupport", Map.of("properties", List.of("additionalTextEdits", "detail"))), "contextSupport", true)),
+                        Map.entry("publishDiagnostics", Map.of()),
+                        Map.entry("signatureHelp", Map.of("signatureInformation", Map.of("parameterInformation", Map.of("labelOffsetSupport", true),
+                                "documentationFormat", List.of("plaintext", "markdown"), "activeParameterSupport", true))),
+                        Map.entry("hover", Map.of("contentFormat", List.of("markdown", "plaintext"))),
+                        Map.entry("references", Map.of()),
+                        Map.entry("inlayHint", Map.of()),
+                        Map.entry("documentSymbol", Map.of("hierarchicalDocumentSymbolSupport", true)),
+                        Map.entry("diagnostic", Map.of("dynamicRegistration", false)),
+                        Map.entry("codeAction", Map.of("codeActionLiteralSupport", Map.of("codeActionKind", Map.of("valueSet", List.of("quickfix"))))),
+                        Map.entry("synchronization", Map.of("didSave", false, "dynamicRegistration", false)),
+                        Map.entry("semanticTokens", Map.of("requests", Map.of("full", true), "formats", List.of("relative"),
                                 "tokenTypes", List.of("namespace", "class", "enum", "interface", "typeParameter", "type",
                                         "parameter", "variable", "property", "enumMember", "function", "method"),
-                                "tokenModifiers", List.of("declaration", "readonly", "static", "async", "defaultLibrary", "local"))),
+                                "tokenModifiers", List.of("declaration", "readonly", "static", "async", "defaultLibrary", "local")))),
                 "window", Map.of("workDoneProgress", true),
                 "workspace", Map.of("didChangeWatchedFiles", Map.of("dynamicRegistration", true),
                         "workspaceFolders", true, "configuration", true));
@@ -102,6 +119,7 @@ final class LspTsBackend implements TsBackend {
         if (initializationOptions != null) params.put("initializationOptions", initializationOptions);
         this.ready = client.request("initialize", params).thenApply(result -> {
             client.notify("initialized", Map.of());
+            client.notify("workspace/didChangeConfiguration", Map.of("settings", Map.of("typescript", languageSettings(), "javascript", languageSettings())));
             return result;
         });
     }
@@ -289,6 +307,79 @@ final class LspTsBackend implements TsBackend {
                 markdown.append(text(contents));
             }
             return TsQuickInfoText.fromMarkdown(markdown.toString());
+        });
+    }
+
+    @Override
+    public @NotNull CompletableFuture<List<TsLanguageService.Reference>> references(@NotNull Path file, int line, int character) {
+        Map<String, Object> params = Map.of("textDocument", Map.of("uri", uri(file)), "position", Map.of("line", line, "character", character),
+                "context", Map.of("includeDeclaration", true));
+        return loaded().thenCompose(ignored -> client.request("textDocument/references", params)).thenApply(result -> {
+            List<TsLanguageService.Reference> references = new ArrayList<>();
+            if (result == null || !result.isJsonArray()) return references;
+            for (JsonElement element : result.getAsJsonArray()) {
+                JsonObject location = element.getAsJsonObject();
+                try {
+                    references.add(new TsLanguageService.Reference(Path.of(new URI(location.get("uri").getAsString())),
+                            range(location.getAsJsonObject("range")), false));
+                } catch (Exception e) {
+                    LOG.debug("Unsupported location " + location, e);
+                }
+            }
+            return references;
+        });
+    }
+
+    /** LSP SymbolKind (1-based) to our kind names. */
+    private static final String[] SYMBOL_KINDS = {"other", "module", "module", "module", "module", "class", "method", "property", "property",
+            "method", "enum", "interface", "function", "variable", "constant", "other", "other", "other", "other", "other", "other", "other",
+            "enumMember", "class", "other", "other", "typeParameter"};
+
+    @Override
+    public @NotNull CompletableFuture<List<TsLanguageService.Symbol>> symbols(@NotNull Path file) {
+        return loaded().thenCompose(ignored -> client.request("textDocument/documentSymbol", Map.of("textDocument", Map.of("uri", uri(file)))))
+                .thenApply(result -> result != null && result.isJsonArray() ? symbols(result.getAsJsonArray()) : List.of());
+    }
+
+    /** DocumentSymbol[] (hierarchical) or SymbolInformation[] (flat). */
+    private static @NotNull List<TsLanguageService.Symbol> symbols(@NotNull JsonArray items) {
+        List<TsLanguageService.Symbol> result = new ArrayList<>();
+        for (JsonElement element : items) {
+            JsonObject item = element.getAsJsonObject();
+            int kind = item.has("kind") ? item.get("kind").getAsInt() : 0;
+            TsLanguageService.Range range = range(item.has("range") ? item.getAsJsonObject("range") : item.getAsJsonObject("location").getAsJsonObject("range"));
+            TsLanguageService.Range selection = item.has("selectionRange") ? range(item.getAsJsonObject("selectionRange")) : range;
+            List<TsLanguageService.Symbol> children = item.has("children") ? symbols(item.getAsJsonArray("children")) : List.of();
+            result.add(new TsLanguageService.Symbol(item.get("name").getAsString(), kind < SYMBOL_KINDS.length ? SYMBOL_KINDS[kind] : "other",
+                    range, selection, children));
+        }
+        return result;
+    }
+
+    @Override
+    public @NotNull CompletableFuture<List<TsLanguageService.InlayHint>> inlayHints(@NotNull Path file, @NotNull CharSequence text) {
+        int[] lineStarts = lineStarts(text);
+        Map<String, Object> params = Map.of("textDocument", Map.of("uri", uri(file)),
+                "range", Map.of("start", Map.of("line", 0, "character", 0), "end", Map.of("line", lineStarts.length, "character", 0)));
+        return loaded().thenCompose(ignored -> client.request("textDocument/inlayHint", params)).thenApply(result -> {
+            List<TsLanguageService.InlayHint> hints = new ArrayList<>();
+            if (result == null || !result.isJsonArray()) return hints;
+            for (JsonElement element : result.getAsJsonArray()) {
+                JsonObject hint = element.getAsJsonObject();
+                if (hint.has("kind") && hint.get("kind").getAsInt() != 2) continue; // 2: parameter
+                JsonObject position = hint.getAsJsonObject("position");
+                int line = position.get("line").getAsInt();
+                if (line >= lineStarts.length) continue;
+                StringBuilder label = new StringBuilder();
+                JsonElement value = hint.get("label");
+                if (value.isJsonArray()) {
+                    for (JsonElement part : value.getAsJsonArray()) label.append(part.getAsJsonObject().get("value").getAsString());
+                } else {
+                    label.append(value.getAsString());
+                }
+                hints.add(new TsLanguageService.InlayHint(lineStarts[line] + position.get("character").getAsInt(), label.toString().strip()));
+            }
+            return hints;
         });
     }
 

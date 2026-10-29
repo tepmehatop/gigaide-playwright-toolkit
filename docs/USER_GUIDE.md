@@ -53,7 +53,13 @@ Project: ~/projects/autotests
 - от TypeScript: *Add import from …*, *Add missing function declaration …*, *Infer parameter types from usage* и другие;
 - от плагина: `page` без типа → *Annotate 'page' as Page (@playwright/test)* (с импортом), `locator`/`selector`/`name` → *Annotate as string*, `name = string` → *Change '= string' to ': string'*.
 
-**Параметры метода** — при вводе `(` и по **Ctrl+P / Cmd+P**: `selectFromDropDown(page: Page, name: string, locator: string)`, текущий параметр выделен.
+**Параметры метода** — при вводе `(`, при клике внутрь скобок вызова, после запятой и по **Ctrl+P / Cmd+P**: `selectFromDropDown(page: Page, name: string, locator: string)`, текущий параметр выделен жирным.
+
+**Подсказки имён параметров** — серые `locator:` / `name:` перед строками, числами, `true`/`false`/`null` в аргументах, как в IDEA.
+
+**Find Usages** — **Alt+F7** на имени метода, функции, фикстуры или поля: все использования по проекту в окне Find.
+
+**Structure** — **Cmd+F12 / Ctrl+F12** (всплывающее окно) или окно **Structure**: классы, их поля и методы, функции, тесты файла.
 
 **Документация** — при наведении мыши и по **Ctrl+Q / F1**: тип символа и его описание (JSDoc), в том числе для методов Playwright.
 
@@ -254,7 +260,7 @@ Tools
 | Пути к Node.js, TypeScript (tsc/tsgo TS 7 или tsserver.js TS 5/6), vscode-js-debug | пусто — ищутся автоматически (найденный путь показан под полем) |
 | TypeScript server: Auto / Native TypeScript 7 / tsserver.js / typescript-language-server | значение сборки (auto, tsserver или tsls) |
 | Go to Declaration через TypeScript-сервер | вкл. |
-| Code completion from TypeScript, TypeScript errors in the editor | вкл. |
+| Code completion from TypeScript, TypeScript errors in the editor, Parameter name hints | вкл. |
 | Semantic highlighting, Rainbow brackets | вкл. |
 | Не заходить в код Playwright при step into | вкл. |
 | Show browser and keep it open between runs | выкл. |

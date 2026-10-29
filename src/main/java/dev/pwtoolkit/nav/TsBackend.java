@@ -45,6 +45,15 @@ interface TsBackend {
     /** Type and documentation of the symbol at the position (quick documentation, hover). */
     @NotNull CompletableFuture<TsLanguageService.QuickInfo> quickInfo(@NotNull Path file, int line, int character);
 
+    /** All references to the symbol at the position, the declaration included. */
+    @NotNull CompletableFuture<List<TsLanguageService.Reference>> references(@NotNull Path file, int line, int character);
+
+    /** Declarations of the file as a tree: classes, methods, functions, tests ("test(...) callback"). */
+    @NotNull CompletableFuture<List<TsLanguageService.Symbol>> symbols(@NotNull Path file);
+
+    /** Parameter name hints ("locator:") before literal arguments; offsets in {@code text}. */
+    @NotNull CompletableFuture<List<TsLanguageService.InlayHint>> inlayHints(@NotNull Path file, @NotNull CharSequence text);
+
     /** Called when the server pushes new diagnostics for a file by itself (typescript-language-server). */
     default void onDiagnosticsPushed(@NotNull java.util.function.Consumer<Path> listener) {
     }

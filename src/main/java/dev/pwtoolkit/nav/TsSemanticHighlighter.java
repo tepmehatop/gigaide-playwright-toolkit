@@ -45,6 +45,8 @@ public final class TsSemanticHighlighter implements Disposable {
     private static final Key<List<RangeHighlighter>> HIGHLIGHTERS = Key.create("pwtoolkit.semantic.highlighters");
     /** Last result for the document, e.g. "semantic 120, brackets 68" or why semantic ranges are missing. */
     private static final Key<String> STATS = Key.create("pwtoolkit.semantic.stats");
+    /** Parameter name hints shown in an editor. */
+    private static final Key<List<com.intellij.openapi.editor.Inlay<?>>> INLAYS = Key.create("pwtoolkit.parameter.hints");
     private static final int DELAY_MS = 300;
     /** Just above the IDE's own info highlights (3000), which GigaIDE puts on the same words with plain colors; below warnings and errors. */
     static final int LAYER = HighlighterLayer.ADDITIONAL_SYNTAX + 1;
@@ -129,13 +131,69 @@ public final class TsSemanticHighlighter implements Disposable {
                 }
             }
         }
+        List<TsLanguageService.InlayHint> hints = settings.parameterHints ? inlayHints(file, document) : List.of();
         List<TsLanguageService.SemanticToken> allTokens = tokens;
         String stats = "semantic " + tokens.size() + ", brackets " + brackets.size() + (problem == null ? "" : " - " + problem);
         ApplicationManager.getApplication().invokeLater(() -> {
             if (document.getModificationStamp() != stamp) return; // a newer request is on its way
             apply(document, stamp, allTokens, brackets, typeScript);
+            if (hints != null) applyInlays(document, hints);
             document.putUserData(STATS, stats);
         }, project.getDisposed());
+    }
+
+    /** Null when the server cannot be asked (the shown hints are kept then). */
+    private @Nullable List<TsLanguageService.InlayHint> inlayHints(@NotNull VirtualFile file, @NotNull Document document) {
+        CompletableFuture<List<TsLanguageService.InlayHint>> future = ApplicationManager.getApplication().runReadAction(
+                (Computable<CompletableFuture<List<TsLanguageService.InlayHint>>>) () -> TsLanguageService.getInstance(project).inlayHints(file, document));
+        if (future == null) return null;
+        try {
+            return future.get(10, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            LOG.debug("Inlay hints request failed", e);
+            return null;
+        }
+    }
+
+    /** "locator:" before literal arguments, drawn like IntelliJ's parameter hints. On the EDT. */
+    private void applyInlays(@NotNull Document document, @NotNull List<TsLanguageService.InlayHint> hints) {
+        for (com.intellij.openapi.editor.Editor editor : EditorFactory.getInstance().getEditors(document, project)) {
+            List<com.intellij.openapi.editor.Inlay<?>> old = editor.getUserData(INLAYS);
+            if (old != null && sameHints(old, hints)) continue; // no flicker while typing elsewhere
+            if (old != null) old.forEach(com.intellij.openapi.util.Disposer::dispose);
+            List<com.intellij.openapi.editor.Inlay<?>> added = new ArrayList<>();
+            for (TsLanguageService.InlayHint hint : hints) {
+                if (hint.offset() > document.getTextLength() || hint.text().isEmpty()) continue;
+                var inlay = editor.getInlayModel().addInlineElement(hint.offset(), false,
+                        new com.intellij.codeInsight.daemon.impl.HintRenderer(hint.text()));
+                if (inlay != null) added.add(inlay);
+            }
+            editor.putUserData(INLAYS, added);
+        }
+    }
+
+    private static boolean sameHints(@NotNull List<com.intellij.openapi.editor.Inlay<?>> inlays, @NotNull List<TsLanguageService.InlayHint> hints) {
+        if (inlays.size() != hints.size()) return false;
+        for (int i = 0; i < hints.size(); i++) {
+            var inlay = inlays.get(i);
+            if (!inlay.isValid() || inlay.getOffset() != hints.get(i).offset()
+                    || !(inlay.getRenderer() instanceof com.intellij.codeInsight.daemon.impl.HintRenderer renderer)
+                    || !hints.get(i).text().equals(renderer.getText())) return false;
+        }
+        return true;
+    }
+
+    /** Parameter name hints in the editor, for tests. */
+    static @NotNull List<String> shownHints(@NotNull com.intellij.openapi.editor.Editor editor) {
+        List<com.intellij.openapi.editor.Inlay<?>> inlays = editor.getUserData(INLAYS);
+        List<String> result = new ArrayList<>();
+        if (inlays == null) return result;
+        for (var inlay : inlays) {
+            if (inlay.isValid() && inlay.getRenderer() instanceof com.intellij.codeInsight.daemon.impl.HintRenderer renderer) {
+                result.add(inlay.getOffset() + ":" + renderer.getText());
+            }
+        }
+        return result;
     }
 
     /**

@@ -64,7 +64,13 @@ public class TsParameterInfoAndDocTest extends BasePlatformTestCase {
         assertTrue(signature.label(), signature.label().contains("login: string") && signature.label().contains("password: string"));
         assertEquals(2, signature.parameters().size());
 
-        MockUpdateParameterInfoContext update = new MockUpdateParameterInfoContext(myFixture.getEditor(), myFixture.getFile(), create.getItemsToShow());
+        int listStart = owner.getTextRange().getStartOffset() + 1;
+        MockUpdateParameterInfoContext update = new MockUpdateParameterInfoContext(myFixture.getEditor(), myFixture.getFile(), create.getItemsToShow()) {
+            @Override
+            public int getParameterListStart() {
+                return listStart;
+            }
+        };
         update.setParameterOwner(owner);
         assertSame(owner, handler.findElementForUpdatingParameterInfo(update));
         handler.updateParameterInfo(owner, update);

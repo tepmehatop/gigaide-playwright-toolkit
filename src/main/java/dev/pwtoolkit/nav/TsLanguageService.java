@@ -139,6 +139,42 @@ public final class TsLanguageService implements Disposable {
         return server.update(file, document).thenCompose(ignored -> server.backend.quickInfo(file.toNioPath(), line, character));
     }
 
+    /** A parameter name hint shown before the argument at {@code offset}. */
+    public record InlayHint(int offset, @NotNull String text) {
+    }
+
+    /** Must be called inside a read action. Null when no server is available for the file. */
+    public @Nullable CompletableFuture<List<InlayHint>> inlayHints(@NotNull VirtualFile file, @NotNull Document document) {
+        Server server = serverFor(file);
+        if (server == null) return null;
+        CharSequence text = document.getImmutableCharSequence();
+        return server.update(file, document).thenCompose(ignored -> server.backend.inlayHints(file.toNioPath(), text));
+    }
+
+    public record Reference(@NotNull Path file, @NotNull Range range, boolean definition) {
+    }
+
+    /** kind: class, interface, enum, method, property, function, variable, constant, module, other. */
+    public record Symbol(@NotNull String name, @NotNull String kind, @NotNull Range range, @NotNull Range selection,
+                         @NotNull List<Symbol> children) {
+    }
+
+    /** Must be called inside a read action. Null when no server is available for the file. */
+    public @Nullable CompletableFuture<List<Reference>> references(@NotNull VirtualFile file, @NotNull Document document, int offset) {
+        Server server = serverFor(file);
+        if (server == null) return null;
+        int line = document.getLineNumber(offset);
+        int character = offset - document.getLineStartOffset(line);
+        return server.update(file, document).thenCompose(ignored -> server.backend.references(file.toNioPath(), line, character));
+    }
+
+    /** Must be called inside a read action. Null when no server is available for the file. */
+    public @Nullable CompletableFuture<List<Symbol>> symbols(@NotNull VirtualFile file, @NotNull Document document) {
+        Server server = serverFor(file);
+        if (server == null) return null;
+        return server.update(file, document).thenCompose(ignored -> server.backend.symbols(file.toNioPath()));
+    }
+
     /** 0-based lines, UTF-16 characters. */
     public record Range(int line, int character, int endLine, int endCharacter) {
     }
