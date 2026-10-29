@@ -1,5 +1,6 @@
 package dev.pwtoolkit.tests;
 
+import com.intellij.ide.impl.ProjectUtil;
 import com.intellij.notification.NotificationGroupManager;
 import com.intellij.notification.NotificationType;
 import com.intellij.openapi.actionSystem.AnActionEvent;
@@ -13,29 +14,30 @@ import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
-import dev.pwtoolkit.run.PwBrowserServer;
-import dev.pwtoolkit.run.PwDebugController;
+import com.intellij.openapi.ui.popup.JBPopup;
+import com.intellij.openapi.ui.popup.JBPopupFactory;
+import com.intellij.ui.ColoredListCellRenderer;
+import com.intellij.ui.SimpleTextAttributes;
+import dev.pwtoolkit.run.PwLocatorPicker;
+import dev.pwtoolkit.run.PwPickLocatorSupport;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import javax.swing.JList;
 import java.awt.datatransfer.StringSelection;
 import java.io.File;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
- * Pick Locator (like VS Code's "Pick locator" and IDEA's Web Inspector): the browser kept open by Show Browser highlights
- * the element under the mouse; the clicked element's locator is inserted at the caret and copied to the clipboard.
- * In a string literal the selector is inserted ({@code internal:role=button[name="Sign in"i]}), elsewhere the code
- * ({@code getByRole('button', { name: 'Sign in' })}).
+ * Pick Locator (like IDEA's Web Inspector): click an element in the picker browser; its locator candidates - unique on
+ * the page, best first - are offered, the chosen one is inserted at the caret (the selector inside a string literal,
+ * the code elsewhere) and copied to the clipboard.
  */
 public final class PwPickLocatorAction extends PwToolsActions.Base {
-    private static final Pattern TEST_ID_ATTRIBUTE = Pattern.compile("testIdAttribute\\s*:\\s*['\"]([^'\"]+)['\"]");
+    private static final String[] RANKS = {"", "test attribute", "data-testid", "id", "name / class", "role", "XPath by text", "inside a unique parent", "by position"};
 
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
@@ -43,51 +45,87 @@ public final class PwPickLocatorAction extends PwToolsActions.Base {
         PwToolsActions.Command command = command(e);
         if (project == null || command == null) return;
         Editor editor = e.getData(CommonDataKeys.EDITOR);
-        try {
-            PwBrowserServer.getInstance(project).ensureStarted(command.workDir(), command.node(), command.cli());
-        } catch (Exception ex) {
-            Messages.showErrorDialog(project, "Cannot start the browser: " + ex.getMessage(), "Pick Locator");
-            return;
-        }
-        String testId = testIdAttribute(command.workDir());
-        new Task.Backgroundable(project, "Pick locator: click an element in the browser", true) {
+        new Task.Backgroundable(project, "Pick locator", true) {
             @Override
             public void run(@NotNull ProgressIndicator indicator) {
-                indicator.setText("Click an element in the browser (open the page in it first: Show Browser keeps it after a test run)");
-                PwDebugController controller = PwBrowserServer.getInstance(project).controller();
-                if (controller == null) {
-                    balloon(project, "The browser is not available", NotificationType.ERROR);
+                PwLocatorPicker picker = PwLocatorPicker.getInstance(project);
+                try {
+                    indicator.setText("Starting the browser for picking locators...");
+                    if (picker.ensureStarted(command.workDir(), command.node(), false)) {
+                        String url = askUrl(project, command.workDir(), picker.lastUrl());
+                        if (url != null) picker.navigate(url);
+                    }
+                } catch (Exception ex) {
+                    balloon(project, "Pick locator: " + ex.getMessage(), NotificationType.ERROR);
                     return;
                 }
-                CompletableFuture<PwDebugController.Picked> picked = controller.pickLocator(testId);
-                try {
-                    while (true) {
-                        if (indicator.isCanceled()) {
-                            picked.cancel(false);
-                            return;
-                        }
-                        try {
-                            PwDebugController.Picked result = picked.get(100, TimeUnit.MILLISECONDS);
-                            ApplicationManager.getApplication().invokeLater(() -> insert(project, editor, result));
-                            return;
-                        } catch (TimeoutException ignored) {
-                        }
+                indicator.setText("Click an element in the Pick Locator browser (Esc there cancels)");
+                CompletableFuture<List<PwLocatorPicker.Candidate>> picked = picker.pick();
+                while (true) {
+                    if (indicator.isCanceled()) {
+                        picker.cancel();
+                        return;
                     }
-                } catch (java.util.concurrent.CancellationException ignored) {
-                } catch (Exception ex) {
-                    balloon(project, "Pick locator failed: " + ex.getMessage(), NotificationType.ERROR);
+                    try {
+                        List<PwLocatorPicker.Candidate> candidates = picked.get(100, TimeUnit.MILLISECONDS);
+                        if (!candidates.isEmpty()) ApplicationManager.getApplication().invokeLater(() -> choose(project, editor, candidates));
+                        return;
+                    } catch (TimeoutException ignored) {
+                    } catch (Exception ex) {
+                        balloon(project, "Pick locator: " + (ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage()), NotificationType.ERROR);
+                        return;
+                    }
                 }
             }
         }.queue();
     }
 
+    /** The page to open in a just started picker browser: the last one, or baseURL of playwright.config. */
+    static @Nullable String askUrl(@NotNull Project project, @NotNull File workDir, @Nullable String last) {
+        String initial = last != null ? last : PwPickLocatorSupport.baseUrl(workDir);
+        String[] url = new String[1];
+        ApplicationManager.getApplication().invokeAndWait(() -> url[0] = Messages.showInputDialog(project,
+                "Page to open in the Pick Locator browser (you can also type it in the browser; logins are kept between picks):",
+                "Pick Locator", null, initial == null ? "https://" : initial, null));
+        return url[0] == null || url[0].isBlank() || url[0].equals("https://") ? null : url[0].trim();
+    }
+
+    /** One candidate: inserted at once; several: a list, best first. On the EDT. */
+    static void choose(@NotNull Project project, @Nullable Editor editor, @NotNull List<PwLocatorPicker.Candidate> candidates) {
+        ProjectUtil.focusProjectWindow(project, true);
+        if (candidates.size() == 1) {
+            insert(project, editor, candidates.get(0));
+            return;
+        }
+        JBPopup popup = JBPopupFactory.getInstance().createPopupChooserBuilder(candidates)
+                .setTitle(candidates.get(0).count() == 1 ? "Choose Locator (unique on the page, best first)" : "No unique locator: choose one")
+                .setRenderer(new ColoredListCellRenderer<PwLocatorPicker.Candidate>() {
+                    @Override
+                    protected void customizeCellRenderer(@NotNull JList<? extends PwLocatorPicker.Candidate> list, PwLocatorPicker.Candidate value,
+                                                         int index, boolean selected, boolean hasFocus) {
+                        append(value.code(), SimpleTextAttributes.REGULAR_ATTRIBUTES);
+                        append("   " + label(value), SimpleTextAttributes.GRAYED_ATTRIBUTES);
+                        if (value.count() > 1) append("   " + value.count() + " matches!", SimpleTextAttributes.ERROR_ATTRIBUTES);
+                    }
+                })
+                .setItemChosenCallback(chosen -> insert(project, editor, chosen))
+                .createPopup();
+        if (editor != null && !editor.isDisposed()) popup.showInBestPositionFor(editor);
+        else popup.showCenteredInCurrentWindow(project);
+    }
+
+    static @NotNull String label(@NotNull PwLocatorPicker.Candidate candidate) {
+        String rank = candidate.rank() > 0 && candidate.rank() < RANKS.length ? RANKS[candidate.rank()] : candidate.kind();
+        return candidate.rank() <= 2 ? rank + " " + candidate.kind() : rank;
+    }
+
     /** At the caret (replacing the selection) when the editor is writable; always to the clipboard. On the EDT. */
-    static void insert(@NotNull Project project, @Nullable Editor editor, @NotNull PwDebugController.Picked picked) {
-        String text = picked.locator();
+    static void insert(@NotNull Project project, @Nullable Editor editor, @NotNull PwLocatorPicker.Candidate candidate) {
+        String text = candidate.code();
         if (editor != null && !editor.isDisposed() && editor.getDocument().isWritable()) {
             Document document = editor.getDocument();
             int caret = editor.getCaretModel().getOffset();
-            if (insideString(document.getImmutableCharSequence(), caret)) text = picked.selector();
+            if (insideString(document.getImmutableCharSequence(), caret)) text = candidate.selector();
             String inserted = text;
             WriteCommandAction.runWriteCommandAction(project, "Pick Locator", null, () -> {
                 int start = editor.getSelectionModel().hasSelection() ? editor.getSelectionModel().getSelectionStart() : caret;
@@ -98,7 +136,8 @@ public final class PwPickLocatorAction extends PwToolsActions.Base {
             });
         }
         CopyPasteManager.getInstance().setContents(new StringSelection(text));
-        balloon(project, "Picked: " + text + " (copied to the clipboard)", NotificationType.INFORMATION);
+        balloon(project, "Locator: " + text + (candidate.count() > 1 ? " (" + candidate.count() + " matches on the page!)" : "")
+                + " - copied to the clipboard", candidate.count() > 1 ? NotificationType.WARNING : NotificationType.INFORMATION);
     }
 
     /** An odd number of unescaped quotes of one kind before the caret on its line. */
@@ -119,20 +158,30 @@ public final class PwPickLocatorAction extends PwToolsActions.Base {
         return open != 0;
     }
 
-    private static @Nullable String testIdAttribute(@NotNull File workDir) {
-        for (String name : new String[]{"playwright.config.ts", "playwright.config.js", "playwright.config.mjs"}) {
-            File config = new File(workDir, name);
-            if (!config.isFile()) continue;
-            try {
-                Matcher matcher = TEST_ID_ATTRIBUTE.matcher(Files.readString(config.toPath(), StandardCharsets.UTF_8));
-                if (matcher.find()) return matcher.group(1);
-            } catch (Exception ignored) {
-            }
-        }
-        return null;
-    }
-
     private static void balloon(@NotNull Project project, @NotNull String message, @NotNull NotificationType type) {
         NotificationGroupManager.getInstance().getNotificationGroup("Playwright Toolkit").createNotification(message, type).notify(project);
+    }
+
+    /** Tools | Playwright | Open Page in Pick Locator Browser... */
+    public static final class OpenPage extends PwToolsActions.Base {
+        @Override
+        public void actionPerformed(@NotNull AnActionEvent e) {
+            Project project = e.getProject();
+            PwToolsActions.Command command = command(e);
+            if (project == null || command == null) return;
+            new Task.Backgroundable(project, "Opening the Pick Locator browser", true) {
+                @Override
+                public void run(@NotNull ProgressIndicator indicator) {
+                    PwLocatorPicker picker = PwLocatorPicker.getInstance(project);
+                    try {
+                        picker.ensureStarted(command.workDir(), command.node(), false);
+                        String url = askUrl(project, command.workDir(), picker.lastUrl());
+                        if (url != null) picker.navigate(url);
+                    } catch (Exception ex) {
+                        balloon(project, "Pick locator: " + ex.getMessage(), NotificationType.ERROR);
+                    }
+                }
+            }.queue();
+        }
     }
 }

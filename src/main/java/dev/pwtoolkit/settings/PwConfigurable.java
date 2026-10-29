@@ -36,6 +36,7 @@ public final class PwConfigurable implements SearchableConfigurable {
     private JBCheckBox completion;
     private JBCheckBox diagnostics;
     private JBCheckBox parameterHints;
+    private com.intellij.ui.components.JBTextField locatorAttributes;
     private JBCheckBox rainbowBrackets;
     private JBCheckBox showBrowser;
     private JBCheckBox pauseOnFailure;
@@ -72,6 +73,7 @@ public final class PwConfigurable implements SearchableConfigurable {
         completion = new JBCheckBox("Code completion from TypeScript (page., locator., fixtures, Page Objects)");
         diagnostics = new JBCheckBox("TypeScript errors in the editor, with quick fixes (Alt+Enter: Add import...)");
         parameterHints = new JBCheckBox("Parameter name hints before literal arguments (locator: \"#id\")");
+        locatorAttributes = new com.intellij.ui.components.JBTextField();
         rainbowBrackets = new JBCheckBox("Rainbow brackets in TS/JS files (color by nesting depth)");
         semanticHighlighting.setToolTipText("Unique colors for parameters and local variables: Settings | Editor | Color Scheme | Language Defaults | Semantic highlighting");
         showBrowser = new JBCheckBox("Show the browser while debugging (--headed)");
@@ -110,6 +112,8 @@ public final class PwConfigurable implements SearchableConfigurable {
                 .addComponent(skipInternals)
                 .addComponent(reuseBrowser)
                 .addComponent(exploreLocators)
+                .addLabeledComponent("Pick Locator: test attributes, best first:", locatorAttributes)
+                .addComponentToRightColumn(hint("A locator must be unique on the page; then these attributes, id, name/class, role, XPath"))
                 .addComponent(showBrowser)
                 .addComponent(pauseOnFailure)
                 .addSeparator()
@@ -144,6 +148,7 @@ public final class PwConfigurable implements SearchableConfigurable {
                 || completion.isSelected() != s.completion
                 || diagnostics.isSelected() != s.diagnostics
                 || parameterHints.isSelected() != s.parameterHints
+                || !locatorAttributes.getText().trim().equals(s.locatorAttributes)
                 || rainbowBrackets.isSelected() != s.rainbowBrackets
                 || showBrowser.isSelected() != s.showBrowserWhenDebugging
                 || pauseOnFailure.isSelected() != s.pauseOnFailure
@@ -168,6 +173,11 @@ public final class PwConfigurable implements SearchableConfigurable {
         s.semanticHighlighting = semanticHighlighting.isSelected();
         s.completion = completion.isSelected();
         s.parameterHints = parameterHints.isSelected();
+        if (!locatorAttributes.getText().trim().equals(s.locatorAttributes)) {
+            // the picker browser gets the attributes at start
+            for (var project : ProjectManager.getInstance().getOpenProjects()) dev.pwtoolkit.run.PwLocatorPicker.getInstance(project).stop();
+        }
+        s.locatorAttributes = locatorAttributes.getText().trim();
         boolean diagnosticsChanged = s.diagnostics != diagnostics.isSelected();
         s.diagnostics = diagnostics.isSelected();
         if (diagnosticsChanged) {
@@ -210,6 +220,7 @@ public final class PwConfigurable implements SearchableConfigurable {
         completion.setSelected(s.completion);
         diagnostics.setSelected(s.diagnostics);
         parameterHints.setSelected(s.parameterHints);
+        locatorAttributes.setText(s.locatorAttributes);
         rainbowBrackets.setSelected(s.rainbowBrackets);
         showBrowser.setSelected(s.showBrowserWhenDebugging);
         pauseOnFailure.setSelected(s.pauseOnFailure);

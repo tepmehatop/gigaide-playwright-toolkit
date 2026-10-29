@@ -32,6 +32,8 @@ public final class PwSettings implements PersistentStateComponent<PwSettings.Sta
         public boolean diagnostics = true;
         /** Parameter name hints before literal arguments: selectFromDropDown(page, locator: "#a"). */
         public boolean parameterHints = true;
+        /** Pick Locator: attributes for tests, best first (the last one ranks below the others, like data-testid of unit tests). */
+        public String locatorAttributes = "data-qa, data-test, data-cy, data-e2e, data-testid";
         public boolean showBrowserWhenDebugging = true;
         public boolean pauseOnFailure = true;
         public boolean disableGigaJestMarker = true;
