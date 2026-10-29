@@ -52,7 +52,7 @@ intellijPlatform {
     buildSearchableOptions = false
     instrumentCode = false
     pluginConfiguration {
-        changeNotes = "Pick Locator ranks locators like an autotest engineer: unique on the page first, then data-qa, data-testid, id, name/class, role, XPath; own browser with a persistent profile. See CHANGELOG.md."
+        changeNotes = "83 live templates for TS/JS (WebStorm fori, itar, iter...; VS Code snippets) and Playwright (pwgoto, pwwait, pwroute, pwapi...). See CHANGELOG.md."
         ideaVersion {
             sinceBuild = "251"
             untilBuild = provider { null }
