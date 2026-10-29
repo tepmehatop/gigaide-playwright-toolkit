@@ -49,7 +49,13 @@ Project: ~/projects/autotests
 **Автодополнение** (Ctrl+Space, после `.` открывается само): члены `page.`, `locator.`, фикстур и Page Object, ключевые слова (`await`, `const`), глобальные имена (`console`). Варианты даёт тот же TypeScript-сервер, что и переходы. У методов сразу добавляются скобки, курсор ставится внутрь.
 Функции из других файлов проекта тоже предлагаются (справа видно, откуда, например `../../utils/customHelpers`): при выборе импорт добавляется в начало файла.
 
-**Ошибки TypeScript** подчёркиваются в редакторе: неимпортированная функция, опечатка в имени метода, неверный тип аргумента. Подсказка — при наведении, F2 — к следующей ошибке. **Alt+Enter** на ошибке предлагает исправления TypeScript: *Add import from …*, *Add missing function declaration …* и другие.
+**Ошибки TypeScript** подчёркиваются в редакторе: неимпортированная функция, опечатка в имени метода, неверный тип аргумента. Причина — в подсказке при наведении; F2 — к следующей ошибке; список ошибок файла — в окне **Problems**. У ошибки появляется лампочка, **Alt+Enter** показывает исправления:
+- от TypeScript: *Add import from …*, *Add missing function declaration …*, *Infer parameter types from usage* и другие;
+- от плагина: `page` без типа → *Annotate 'page' as Page (@playwright/test)* (с импортом), `locator`/`selector`/`name` → *Annotate as string*, `name = string` → *Change '= string' to ': string'*.
+
+**Параметры метода** — при вводе `(` и по **Ctrl+P / Cmd+P**: `selectFromDropDown(page: Page, name: string, locator: string)`, текущий параметр выделен.
+
+**Документация** — при наведении мыши и по **Ctrl+Q / F1**: тип символа и его описание (JSDoc), в том числе для методов Playwright.
 
 **Параметры без типа** — `function selectFromDropDown(page, locator) { await page.click(locator) }`: TypeScript не знает, что `page` — это Page. Тогда, как в IntelliJ, плагин ищет метод по имени в Playwright: Ctrl+Click на `click` предлагает `Page.click`, `Locator.click`…, после `page.` предлагаются методы Playwright. Для точной навигации и проверки типов укажите тип: `page: Page` (`import { Page } from "@playwright/test"`) — с `strict` в tsconfig TypeScript и так подчеркнёт параметр без типа.
 

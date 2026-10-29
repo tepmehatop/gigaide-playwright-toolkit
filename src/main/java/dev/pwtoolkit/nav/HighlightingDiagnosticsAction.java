@@ -97,7 +97,8 @@ public final class HighlightingDiagnosticsAction extends AnAction {
                 + System.getProperty("os.version") + " " + System.getProperty("os.arch") + " | plugin " + (plugin == null ? "?" : plugin.getVersion()));
         lines.add("file: " + (file == null ? "?" : file.getName()) + " line " + line + ": " + lineText);
         String stats = TsSemanticHighlighter.stats(document);
-        lines.add("highlight: " + (stats == null ? "not run for this file yet" : stats));
+        String problems = document.getUserData(TsDiagnostics.STATS);
+        lines.add("highlight: " + (stats == null ? "not run for this file yet" : stats) + (problems == null ? "" : ", " + problems));
         if (file != null) lines.addAll(TsLanguageService.getInstance(project).describe(file));
         if (file != null) {
             java.nio.file.Path root = TsLanguageService.findRoot(file);

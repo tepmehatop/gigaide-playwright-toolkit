@@ -102,7 +102,12 @@ public final class TsCompletionContributor extends CompletionContributor {
         public void handleInsert(@NotNull com.intellij.codeInsight.completion.InsertionContext context,
                                  @NotNull com.intellij.codeInsight.lookup.LookupElement item) {
             int nameStart = context.getStartOffset();
-            if (callable) ParenthesesInsertHandler.getInstance(true).handleInsert(context, item);
+            if (callable) {
+                ParenthesesInsertHandler.getInstance(true).handleInsert(context, item);
+                // like WebStorm: the parameters of the inserted method are shown at once
+                context.setLaterRunnable(() -> com.intellij.codeInsight.AutoPopupController.getInstance(context.getProject())
+                        .autoPopupParameterInfo(context.getEditor(), null));
+            }
             if (!(item.getObject() instanceof TsLanguageService.Completion completion) || !completion.isAutoImport()) return;
             context.commitDocument();
             CompletableFuture<List<TsLanguageService.Edit>> future = TsLanguageService.getInstance(context.getProject())

@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.7.0
+
+- **Ошибки показываются штатно**:
+  - при наведении — подсказка с причиной (например, «'string' only refers to a type, but is being used as a value here (TS2693)»);
+  - лампочка у ошибки и **Alt+Enter** со списком исправлений;
+  - F2 — к следующей ошибке, ошибки текущего файла видны в окне **Problems**.
+
+  В 1.6.0 ошибки рисовались мимо механизма IDE, поэтому подсказки и лампочки не было.
+- **Исправления для хелперов** (в дополнение к исправлениям TypeScript):
+  - `page` без типа → *Annotate 'page' as Page (@playwright/test)*: дописывает `: Page` и импорт;
+  - параметры вроде `locator`, `selector`, `name` → *Annotate as string*; любой параметр → *Annotate as any*;
+  - `name = string` → *Change '= string' to ': string'*.
+- **Подсказка параметров**, как в WebStorm: при вводе `(` и по Ctrl+P / Cmd+P — `selectFromDropDown(page: Page, name: string, locator: string, custom?: any)`, текущий параметр выделен. Показывается и сразу после выбора метода в автодополнении.
+- **Документация при наведении и по Ctrl+Q / F1**: тип и описание от TypeScript, в том числе для методов Playwright (`fill`, `click`, `waitForResponse`…). При Ctrl+наведении — сигнатура.
+
 ## 1.6.0
 
 - **Ошибки TypeScript в редакторе**: красное подчёркивание и подсказка при наведении, F2 переходит к следующей ошибке — например, `Cannot find name 'selectFromDropDown'` для неимпортированной функции. Неиспользуемое показывается серым. JS-плагин GigaIDE таких ошибок не показывает. Отключается в настройках (*TypeScript errors in the editor*).

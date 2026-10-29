@@ -107,6 +107,38 @@ public final class TsLanguageService implements Disposable {
         }
     }
 
+    /** A signature: its label and the [start, end) of every parameter in it. */
+    public record Signature(@NotNull String label, @NotNull List<int[]> parameters, @NotNull String documentation) {
+    }
+
+    /** Empty signatures: no call around the position. */
+    public record SignatureHelp(@NotNull List<Signature> signatures, int activeSignature, int activeParameter) {
+        public static final SignatureHelp NONE = new SignatureHelp(List.of(), 0, 0);
+    }
+
+    /** signature: e.g. "function selectFromDropDown(page: any, name: string): Promise<void>"; null when nothing is known. */
+    public record QuickInfo(@Nullable String signature, @NotNull String documentation) {
+        public static final QuickInfo NONE = new QuickInfo(null, "");
+    }
+
+    /** Must be called inside a read action. Null when no server is available for the file. */
+    public @Nullable CompletableFuture<SignatureHelp> signatureHelp(@NotNull VirtualFile file, @NotNull Document document, int offset) {
+        Server server = serverFor(file);
+        if (server == null) return null;
+        int line = document.getLineNumber(offset);
+        int character = offset - document.getLineStartOffset(line);
+        return server.update(file, document).thenCompose(ignored -> server.backend.signatureHelp(file.toNioPath(), line, character));
+    }
+
+    /** Must be called inside a read action. Null when no server is available for the file. */
+    public @Nullable CompletableFuture<QuickInfo> quickInfo(@NotNull VirtualFile file, @NotNull Document document, int offset) {
+        Server server = serverFor(file);
+        if (server == null) return null;
+        int line = document.getLineNumber(offset);
+        int character = offset - document.getLineStartOffset(line);
+        return server.update(file, document).thenCompose(ignored -> server.backend.quickInfo(file.toNioPath(), line, character));
+    }
+
     /** 0-based lines, UTF-16 characters. */
     public record Range(int line, int character, int endLine, int endCharacter) {
     }
@@ -229,7 +261,12 @@ public final class TsLanguageService implements Disposable {
             }
             backend.onDiagnosticsPushed(path -> {
                 VirtualFile pushed = LocalFileSystem.getInstance().findFileByNioFile(path);
-                if (pushed != null && !project.isDisposed()) TsSemanticHighlighter.getInstance(project).schedule(pushed);
+                if (pushed == null || project.isDisposed()) return;
+                // typescript-language-server pushes diagnostics later than the IDE asked for them: analyze the file again
+                ApplicationManager.getApplication().runReadAction(() -> {
+                    com.intellij.psi.PsiFile psiFile = com.intellij.psi.PsiManager.getInstance(project).findFile(pushed);
+                    if (psiFile != null) com.intellij.codeInsight.daemon.DaemonCodeAnalyzer.getInstance(project).restart(psiFile);
+                });
             });
             Server server = new Server(root, backend);
             servers.put(root, server);

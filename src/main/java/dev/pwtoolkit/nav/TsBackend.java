@@ -39,6 +39,12 @@ interface TsBackend {
     /** Quick fixes for a diagnostic: "Add import from ...", "Add missing function declaration ...". */
     @NotNull CompletableFuture<List<TsLanguageService.Fix>> fixes(@NotNull Path file, @NotNull TsLanguageService.Diagnostic diagnostic);
 
+    /** Signatures of the call around the position (parameter info). */
+    @NotNull CompletableFuture<TsLanguageService.SignatureHelp> signatureHelp(@NotNull Path file, int line, int character);
+
+    /** Type and documentation of the symbol at the position (quick documentation, hover). */
+    @NotNull CompletableFuture<TsLanguageService.QuickInfo> quickInfo(@NotNull Path file, int line, int character);
+
     /** Called when the server pushes new diagnostics for a file by itself (typescript-language-server). */
     default void onDiagnosticsPushed(@NotNull java.util.function.Consumer<Path> listener) {
     }
