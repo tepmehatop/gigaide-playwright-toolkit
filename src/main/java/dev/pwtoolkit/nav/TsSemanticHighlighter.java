@@ -45,6 +45,8 @@ public final class TsSemanticHighlighter implements Disposable {
     private static final Key<List<RangeHighlighter>> HIGHLIGHTERS = Key.create("pwtoolkit.semantic.highlighters");
     /** Last result for the document, e.g. "semantic 120, brackets 68" or why semantic ranges are missing. */
     private static final Key<String> STATS = Key.create("pwtoolkit.semantic.stats");
+    /** The TypeScript problems shown for a document version: the IDE's analysis removes them, they are put back. */
+    private static final Key<ShownProblems> PROBLEMS = Key.create("pwtoolkit.problems");
     private static final int DELAY_MS = 300;
     /** Just above the IDE's own info highlights (3000), which GigaIDE puts on the same words with plain colors; below warnings and errors. */
     static final int LAYER = HighlighterLayer.ADDITIONAL_SYNTAX + 1;
@@ -58,6 +60,15 @@ public final class TsSemanticHighlighter implements Disposable {
         // colors are picked per scheme, so re-apply when the user switches it
         com.intellij.openapi.application.ApplicationManager.getApplication().getMessageBus().connect(this)
                 .subscribe(com.intellij.openapi.editor.colors.EditorColorsManager.TOPIC, scheme -> scheduleOpenFiles());
+        project.getMessageBus().connect(this).subscribe(com.intellij.codeInsight.daemon.DaemonCodeAnalyzer.DAEMON_EVENT_TOPIC,
+                new com.intellij.codeInsight.daemon.DaemonCodeAnalyzer.DaemonListener() {
+                    @Override
+                    public void daemonFinished(@NotNull java.util.Collection<? extends com.intellij.openapi.fileEditor.FileEditor> fileEditors) {
+                        for (var fileEditor : fileEditors) {
+                            if (fileEditor instanceof com.intellij.openapi.fileEditor.TextEditor textEditor) restoreProblems(textEditor.getEditor().getDocument());
+                        }
+                    }
+                });
         EditorFactory.getInstance().getEventMulticaster().addDocumentListener(new DocumentListener() {
             @Override
             public void documentChanged(@NotNull DocumentEvent event) {
@@ -73,6 +84,35 @@ public final class TsSemanticHighlighter implements Disposable {
         return project.getService(TsSemanticHighlighter.class);
     }
 
+    /** The problems shown for the current version of the document. */
+    static @NotNull List<TsDiagnostics.Problem> shownProblems(@NotNull Document document) {
+        ShownProblems shown = document.getUserData(PROBLEMS);
+        return shown == null || shown.stamp() != document.getModificationStamp() ? List.of() : shown.problems();
+    }
+
+    /** Puts the TypeScript problems back after the IDE's analysis replaced the highlighting (same document version only). */
+    public void restoreProblems(@NotNull Document document) {
+        ShownProblems shown = document.getUserData(PROBLEMS);
+        if (shown == null || shown.stamp() != document.getModificationStamp() || !PwSettings.getInstance().getState().diagnostics) return;
+        TsDiagnostics.apply(project, document, shown.problems());
+    }
+
+    /** Removes the shown TypeScript errors from open files (the setting was turned off). */
+    public void clearDiagnostics() {
+        for (VirtualFile file : FileEditorManager.getInstance(project).getOpenFiles()) {
+            Document document = FileDocumentManager.getInstance().getCachedDocument(file);
+            if (document == null) continue;
+            document.putUserData(PROBLEMS, null);
+            TsDiagnostics.apply(project, document, List.of());
+        }
+    }
+
+    /** Re-highlights one open file, e.g. when the server pushed new diagnostics for it. */
+    public void schedule(@NotNull VirtualFile file) {
+        if (!FileEditorManager.getInstance(project).isFileOpen(file)) return;
+        alarm.addRequest(() -> highlight(file), DELAY_MS);
+    }
+
     public void scheduleOpenFiles() {
         alarm.cancelAllRequests();
         alarm.addRequest(() -> {
@@ -80,6 +120,9 @@ public final class TsSemanticHighlighter implements Disposable {
                 if (JsFiles.isScript(file)) highlight(file);
             }
         }, DELAY_MS);
+    }
+
+    private record ShownProblems(long stamp, List<TsDiagnostics.Problem> problems) {
     }
 
     /** A bracket and its nesting depth, for rainbow brackets. */
@@ -111,6 +154,11 @@ public final class TsSemanticHighlighter implements Disposable {
             } else {
                 try {
                     tokens = withImportBindings(text, future.get(15, TimeUnit.SECONDS));
+                    List<TsLanguageService.SemanticToken> known = tokens;
+                    if (!known.isEmpty()) {
+                        tokens = ApplicationManager.getApplication().runReadAction(
+                                (Computable<List<TsLanguageService.SemanticToken>>) () -> withUntypedMembers(file, known));
+                    }
                     if (tokens.isEmpty()) problem = "TypeScript server returned no tokens";
                 } catch (Exception e) {
                     problem = "tokens request failed: " + e;
@@ -118,12 +166,73 @@ public final class TsSemanticHighlighter implements Disposable {
                 }
             }
         }
+        List<TsDiagnostics.Problem> problems = settings.diagnostics ? problems(file, document) : null;
         List<TsLanguageService.SemanticToken> allTokens = tokens;
-        String stats = "semantic " + tokens.size() + ", brackets " + brackets.size() + (problem == null ? "" : " - " + problem);
+        String stats = "semantic " + tokens.size() + ", brackets " + brackets.size()
+                + (problems == null ? "" : ", problems " + TsDiagnostics.counts(problems)) + (problem == null ? "" : " - " + problem);
         ApplicationManager.getApplication().invokeLater(() -> {
+            if (document.getModificationStamp() != stamp) return; // a newer request is on its way
             apply(document, stamp, allTokens, brackets, typeScript);
+            if (problems != null) {
+                document.putUserData(PROBLEMS, new ShownProblems(stamp, problems));
+                TsDiagnostics.apply(project, document, problems);
+            }
             document.putUserData(STATS, stats);
         }, project.getDisposed());
+    }
+
+    /** Errors and warnings with their quick fixes; null when the server cannot be asked. */
+    private @Nullable List<TsDiagnostics.Problem> problems(@NotNull VirtualFile file, @NotNull Document document) {
+        TsLanguageService service = TsLanguageService.getInstance(project);
+        CompletableFuture<List<TsLanguageService.Diagnostic>> future = ApplicationManager.getApplication().runReadAction(
+                (Computable<CompletableFuture<List<TsLanguageService.Diagnostic>>>) () -> service.diagnostics(file, document));
+        if (future == null) return null;
+        try {
+            List<TsDiagnostics.Problem> problems = new ArrayList<>();
+            int withFixes = 0;
+            for (TsLanguageService.Diagnostic diagnostic : future.get(15, TimeUnit.SECONDS)) {
+                if (!TsDiagnostics.isShown(diagnostic)) continue;
+                List<TsLanguageService.Fix> fixes = List.of();
+                if (diagnostic.severity().equals("error") && diagnostic.code() > 0 && withFixes++ < 10) {
+                    CompletableFuture<List<TsLanguageService.Fix>> fixFuture = ApplicationManager.getApplication().runReadAction(
+                            (Computable<CompletableFuture<List<TsLanguageService.Fix>>>) () -> service.fixes(file, document, diagnostic));
+                    try {
+                        if (fixFuture != null) fixes = fixFuture.get(5, TimeUnit.SECONDS);
+                    } catch (Exception e) {
+                        LOG.debug("Quick fixes request failed", e);
+                    }
+                }
+                problems.add(new TsDiagnostics.Problem(diagnostic, fixes));
+            }
+            return problems;
+        } catch (Exception e) {
+            LOG.info("[pwtoolkit] diagnostics request failed for " + file.getName(), e);
+            return null;
+        }
+    }
+
+    /**
+     * Members of receivers TypeScript knows nothing about ({@code page.click(...)} with an untyped {@code page}) get no
+     * token: color them by syntax, a call as a method and the rest as a property, like IntelliJ does.
+     */
+    private @NotNull List<TsLanguageService.SemanticToken> withUntypedMembers(@NotNull VirtualFile file,
+                                                                             @NotNull List<TsLanguageService.SemanticToken> tokens) {
+        com.intellij.psi.PsiFile psiFile = com.intellij.psi.PsiManager.getInstance(project).findFile(file);
+        if (psiFile == null) return tokens;
+        java.util.Set<Integer> covered = new java.util.HashSet<>();
+        for (TsLanguageService.SemanticToken token : tokens) covered.add(token.start());
+        List<TsLanguageService.SemanticToken> result = new ArrayList<>(tokens);
+        for (com.intellij.psi.PsiElement leaf = com.intellij.psi.util.PsiTreeUtil.firstChild(psiFile); leaf != null;
+             leaf = com.intellij.psi.util.PsiTreeUtil.nextLeaf(leaf)) {
+            String leafText = leaf.getText();
+            if (!IDENTIFIER.matcher(leafText).matches() || covered.contains(leaf.getTextOffset())) continue;
+            com.intellij.psi.PsiElement previous = com.intellij.psi.util.PsiTreeUtil.prevVisibleLeaf(leaf);
+            if (previous == null || !(previous.getText().equals(".") || previous.getText().equals("?."))) continue;
+            com.intellij.psi.PsiElement next = com.intellij.psi.util.PsiTreeUtil.nextVisibleLeaf(leaf);
+            boolean call = next != null && (next.getText().equals("(") || next.getText().equals("?."));
+            result.add(new TsLanguageService.SemanticToken(leaf.getTextOffset(), leafText.length(), call ? "method" : "property", java.util.Set.of()));
+        }
+        return result;
     }
 
     private @NotNull List<Bracket> collectBrackets(@NotNull VirtualFile file) {

@@ -58,7 +58,8 @@ final class TsserverBackend implements TsBackend {
         this.out = process.getOutputStream();
         startThread("reader", this::readLoop);
         startThread("stderr", this::drainStderr);
-        this.ready = request("configure", Map.of("preferences", Map.of()));
+        this.ready = request("configure", Map.of("preferences", Map.of("includeCompletionsForModuleExports", true,
+                "includeCompletionsWithInsertText", true)));
     }
 
     @Override
@@ -125,7 +126,7 @@ final class TsserverBackend implements TsBackend {
     public @NotNull CompletableFuture<List<TsLanguageService.Completion>> completions(@NotNull Path file, int line, int character,
                                                                                       @Nullable String trigger) {
         Map<String, Object> arguments = new java.util.HashMap<>(Map.of("file", file.toString(), "line", line + 1, "offset", character + 1,
-                "includeExternalModuleExports", false, "includeInsertTextCompletions", true));
+                "includeExternalModuleExports", true, "includeInsertTextCompletions", true));
         if (trigger != null) arguments.put("triggerCharacter", trigger);
         return request("completionInfo", arguments).thenApply(response -> {
             List<TsLanguageService.Completion> completions = new ArrayList<>();
@@ -135,12 +136,95 @@ final class TsserverBackend implements TsBackend {
             for (JsonElement element : entries) {
                 JsonObject entry = element.getAsJsonObject();
                 String name = entry.get("name").getAsString();
+                boolean autoImport = entry.has("hasAction") && entry.get("hasAction").getAsBoolean() && entry.has("source");
                 completions.add(new TsLanguageService.Completion(name, completionKind(entry.has("kind") ? entry.get("kind").getAsString() : ""),
                         entry.has("sortText") ? entry.get("sortText").getAsString() : name,
-                        entry.has("insertText") ? entry.get("insertText").getAsString() : null));
+                        entry.has("insertText") ? entry.get("insertText").getAsString() : null,
+                        autoImport ? entry.get("source").getAsString() : null, autoImport ? entry : null));
             }
             return completions;
         });
+    }
+
+    @Override
+    public @NotNull CompletableFuture<List<TsLanguageService.Edit>> completionEdits(@NotNull Path file, int line, int character,
+                                                                                    @NotNull TsLanguageService.Completion completion) {
+        if (!(completion.data() instanceof JsonObject entry)) return CompletableFuture.completedFuture(List.of());
+        Map<String, Object> name = new java.util.HashMap<>();
+        name.put("name", entry.get("name").getAsString());
+        if (entry.has("source")) name.put("source", entry.get("source").getAsString());
+        if (entry.has("data")) name.put("data", entry.get("data"));
+        return request("completionEntryDetails", Map.of("file", file.toString(), "line", line + 1, "offset", character + 1,
+                "entryNames", List.of(name))).thenApply(response -> {
+            List<TsLanguageService.Edit> edits = new ArrayList<>();
+            JsonElement body = response.get("body");
+            if (body == null || !body.isJsonArray() || body.getAsJsonArray().isEmpty()) return edits;
+            JsonObject details = body.getAsJsonArray().get(0).getAsJsonObject();
+            if (!details.has("codeActions")) return edits;
+            for (JsonElement action : details.getAsJsonArray("codeActions")) edits.addAll(changes(action.getAsJsonObject().getAsJsonArray("changes")));
+            return edits;
+        });
+    }
+
+    @Override
+    public @NotNull CompletableFuture<List<TsLanguageService.Diagnostic>> diagnostics(@NotNull Path file) {
+        Map<String, Object> arguments = Map.of("file", file.toString(), "includeLinePosition", true);
+        CompletableFuture<JsonObject> syntactic = request("syntacticDiagnosticsSync", arguments);
+        CompletableFuture<JsonObject> semantic = request("semanticDiagnosticsSync", arguments);
+        return syntactic.thenCombine(semantic, (a, b) -> {
+            List<TsLanguageService.Diagnostic> result = new ArrayList<>();
+            for (JsonObject response : List.of(a, b)) {
+                JsonElement body = response.get("body");
+                if (body == null || !body.isJsonArray()) continue;
+                for (JsonElement element : body.getAsJsonArray()) {
+                    JsonObject d = element.getAsJsonObject();
+                    JsonObject start = d.getAsJsonObject("startLocation");
+                    JsonObject end = d.getAsJsonObject("endLocation");
+                    String category = d.has("category") ? d.get("category").getAsString() : "error";
+                    result.add(new TsLanguageService.Diagnostic(new TsLanguageService.Range(start.get("line").getAsInt() - 1,
+                            start.get("offset").getAsInt() - 1, end.get("line").getAsInt() - 1, end.get("offset").getAsInt() - 1),
+                            category.equals("error") || category.equals("warning") ? category : "suggestion",
+                            d.has("code") ? d.get("code").getAsInt() : 0, d.get("message").getAsString()));
+                }
+            }
+            return result;
+        });
+    }
+
+    @Override
+    public @NotNull CompletableFuture<List<TsLanguageService.Fix>> fixes(@NotNull Path file, @NotNull TsLanguageService.Diagnostic diagnostic) {
+        TsLanguageService.Range r = diagnostic.range();
+        return request("getCodeFixes", Map.of("file", file.toString(), "startLine", r.line() + 1, "startOffset", r.character() + 1,
+                "endLine", r.endLine() + 1, "endOffset", r.endCharacter() + 1, "errorCodes", List.of(diagnostic.code()))).thenApply(response -> {
+            List<TsLanguageService.Fix> fixes = new ArrayList<>();
+            JsonElement body = response.get("body");
+            if (body == null || !body.isJsonArray()) return fixes;
+            for (JsonElement element : body.getAsJsonArray()) {
+                JsonObject fix = element.getAsJsonObject();
+                List<TsLanguageService.Edit> edits = changes(fix.getAsJsonArray("changes"));
+                if (!edits.isEmpty()) fixes.add(new TsLanguageService.Fix(fix.get("description").getAsString(), edits));
+            }
+            return fixes;
+        });
+    }
+
+    /** FileCodeEdits[]: [{fileName, textChanges: [{start: {line, offset}, end, newText}]}], 1-based. */
+    private static @NotNull List<TsLanguageService.Edit> changes(@Nullable JsonArray changes) {
+        List<TsLanguageService.Edit> edits = new ArrayList<>();
+        if (changes == null) return edits;
+        for (JsonElement change : changes) {
+            JsonObject fileEdits = change.getAsJsonObject();
+            Path path = Path.of(fileEdits.get("fileName").getAsString());
+            for (JsonElement element : fileEdits.getAsJsonArray("textChanges")) {
+                JsonObject textChange = element.getAsJsonObject();
+                JsonObject start = textChange.getAsJsonObject("start");
+                JsonObject end = textChange.getAsJsonObject("end");
+                edits.add(new TsLanguageService.Edit(path, new TsLanguageService.Range(start.get("line").getAsInt() - 1,
+                        start.get("offset").getAsInt() - 1, end.get("line").getAsInt() - 1, end.get("offset").getAsInt() - 1),
+                        textChange.get("newText").getAsString()));
+            }
+        }
+        return edits;
     }
 
     /** TypeScript's ScriptElementKind to our kind names. */
@@ -158,6 +242,7 @@ final class TsserverBackend implements TsBackend {
             case "module", "external module name", "directory", "script" -> "module";
             case "keyword" -> "keyword";
             case "type parameter" -> "typeParameter";
+            case "warning" -> "word"; // names from the file, offered for receivers of type any
             default -> "other";
         };
     }

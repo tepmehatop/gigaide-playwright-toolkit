@@ -33,6 +33,10 @@ final class LspTsBackend implements TsBackend {
      * JS/TS language features" ends, or the first diagnostics arrive. Completed at once for the native server.
      */
     private final CompletableFuture<Void> projectLoaded = new CompletableFuture<>();
+    /** Diagnostics pushed by the server (typescript-language-server has no pull diagnostics), by URI. */
+    private final Map<String, JsonArray> pushedDiagnostics = new java.util.concurrent.ConcurrentHashMap<>();
+    private volatile java.util.function.Consumer<Path> diagnosticsListener = path -> {
+    };
 
     static @NotNull LspTsBackend nativeServer(@NotNull Path root, @NotNull Path exe) throws Exception {
         LspTsBackend backend = new LspTsBackend(root, List.of(exe.toString(), "--lsp", "--stdio"), null, "native TypeScript 7: " + exe);
@@ -54,7 +58,18 @@ final class LspTsBackend implements TsBackend {
         this.client = LspClient.start(command, root.toFile());
         client.onNotification((method, params) -> {
             // diagnostics come after the semantic check, i.e. with the project loaded
-            if ("textDocument/publishDiagnostics".equals(method)) projectLoaded.complete(null);
+            if ("textDocument/publishDiagnostics".equals(method)) {
+                projectLoaded.complete(null);
+                if (params != null && params.isJsonObject() && params.getAsJsonObject().has("diagnostics")) {
+                    String uri = params.getAsJsonObject().get("uri").getAsString();
+                    pushedDiagnostics.put(uri, params.getAsJsonObject().getAsJsonArray("diagnostics"));
+                    try {
+                        diagnosticsListener.accept(Path.of(new URI(uri)));
+                    } catch (Exception e) {
+                        LOG.debug("Unsupported diagnostics uri " + uri, e);
+                    }
+                }
+            }
             if ("$/progress".equals(method) && params != null && params.isJsonObject() && params.getAsJsonObject().has("value")
                     && "end".equals(String.valueOf(params.getAsJsonObject().getAsJsonObject("value").get("kind")).replace("\"", ""))) {
                 projectLoaded.complete(null);
@@ -63,7 +78,11 @@ final class LspTsBackend implements TsBackend {
         String rootUri = root.toUri().toString();
         Map<String, Object> capabilities = Map.of(
                 "textDocument", Map.of("definition", Map.of("linkSupport", true),
-                        "completion", Map.of("completionItem", Map.of("snippetSupport", false), "contextSupport", true),
+                        "completion", Map.of("completionItem", Map.of("snippetSupport", false,
+                                "resolveSupport", Map.of("properties", List.of("additionalTextEdits", "detail"))), "contextSupport", true),
+                        "publishDiagnostics", Map.of(),
+                        "diagnostic", Map.of("dynamicRegistration", false),
+                        "codeAction", Map.of("codeActionLiteralSupport", Map.of("codeActionKind", Map.of("valueSet", List.of("quickfix")))),
                         "synchronization", Map.of("didSave", false, "dynamicRegistration", false),
                         "semanticTokens", Map.of("requests", Map.of("full", true), "formats", List.of("relative"),
                                 "tokenTypes", List.of("namespace", "class", "enum", "interface", "typeParameter", "type",
@@ -154,10 +173,136 @@ final class LspTsBackend implements TsBackend {
                     : item.has("insertText") ? item.get("insertText").getAsString() : null;
             // typescript-language-server replaces the dot too: newText ".name" over the range of "."
             if (insert != null && insert.equals("." + label)) insert = label;
+            // auto-imports: TS 7 says where from in labelDetails.description, typescript-language-server in detail
+            String source = item.has("labelDetails") && item.getAsJsonObject("labelDetails").has("description")
+                    ? item.getAsJsonObject("labelDetails").get("description").getAsString()
+                    : item.has("data") && item.get("data").isJsonObject() && item.getAsJsonObject("data").has("cacheId")
+                    && item.has("detail") && item.get("detail").getAsString().matches("[.@\\w/-]+") ? item.get("detail").getAsString() : null;
             completions.add(new TsLanguageService.Completion(label, kind < COMPLETION_KINDS.length ? COMPLETION_KINDS[kind] : "other",
-                    item.has("sortText") ? item.get("sortText").getAsString() : label, insert));
+                    item.has("sortText") ? item.get("sortText").getAsString() : label, insert, source, item));
         }
         return completions;
+    }
+
+    @Override
+    public @NotNull CompletableFuture<List<TsLanguageService.Edit>> completionEdits(@NotNull Path file, int line, int character,
+                                                                                    @NotNull TsLanguageService.Completion completion) {
+        if (completion.data() == null) return CompletableFuture.completedFuture(List.of());
+        return client.request("completionItem/resolve", completion.data()).thenApply(result -> {
+            List<TsLanguageService.Edit> edits = new ArrayList<>();
+            if (result != null && result.isJsonObject() && result.getAsJsonObject().has("additionalTextEdits")) {
+                for (JsonElement edit : result.getAsJsonObject().getAsJsonArray("additionalTextEdits")) edits.add(edit(file, edit.getAsJsonObject()));
+            }
+            return edits;
+        });
+    }
+
+    @Override
+    public @NotNull CompletableFuture<List<TsLanguageService.Diagnostic>> diagnostics(@NotNull Path file) {
+        boolean pull = ready.isDone() && !ready.isCompletedExceptionally() && ready.join().isJsonObject()
+                && ready.join().getAsJsonObject().getAsJsonObject("capabilities").has("diagnosticProvider");
+        if (!pull) {
+            JsonArray pushed = pushedDiagnostics.get(uri(file));
+            return CompletableFuture.completedFuture(pushed == null ? List.of() : parseDiagnostics(pushed));
+        }
+        return loaded().thenCompose(ignored -> client.request("textDocument/diagnostic", Map.of("textDocument", Map.of("uri", uri(file)))))
+                .thenApply(result -> result != null && result.isJsonObject() && result.getAsJsonObject().has("items")
+                        ? parseDiagnostics(result.getAsJsonObject().getAsJsonArray("items")) : List.of());
+    }
+
+    @Override
+    public @NotNull CompletableFuture<List<TsLanguageService.Fix>> fixes(@NotNull Path file, @NotNull TsLanguageService.Diagnostic diagnostic) {
+        JsonObject lspDiagnostic = new JsonObject();
+        lspDiagnostic.add("range", range(diagnostic.range()));
+        lspDiagnostic.addProperty("code", diagnostic.code());
+        lspDiagnostic.addProperty("message", diagnostic.message());
+        lspDiagnostic.addProperty("severity", diagnostic.severity().equals("error") ? 1 : diagnostic.severity().equals("warning") ? 2 : 4);
+        lspDiagnostic.addProperty("source", "ts");
+        JsonArray diagnostics = new JsonArray();
+        diagnostics.add(lspDiagnostic);
+        JsonObject context = new JsonObject();
+        context.add("diagnostics", diagnostics);
+        JsonArray only = new JsonArray();
+        only.add("quickfix");
+        context.add("only", only);
+        Map<String, Object> params = Map.of("textDocument", Map.of("uri", uri(file)), "range", range(diagnostic.range()), "context", context);
+        return client.request("textDocument/codeAction", params).thenApply(result -> {
+            List<TsLanguageService.Fix> fixes = new ArrayList<>();
+            if (result == null || !result.isJsonArray()) return fixes;
+            for (JsonElement element : result.getAsJsonArray()) {
+                JsonObject action = element.getAsJsonObject();
+                if (!action.has("title") || !action.has("edit")) continue; // bare commands need the client to run them
+                List<TsLanguageService.Edit> edits = workspaceEdit(action.getAsJsonObject("edit"));
+                if (!edits.isEmpty()) fixes.add(new TsLanguageService.Fix(action.get("title").getAsString(), edits));
+            }
+            return fixes;
+        });
+    }
+
+    @Override
+    public void onDiagnosticsPushed(@NotNull java.util.function.Consumer<Path> listener) {
+        diagnosticsListener = listener;
+    }
+
+    private static @NotNull List<TsLanguageService.Diagnostic> parseDiagnostics(@NotNull JsonArray items) {
+        List<TsLanguageService.Diagnostic> result = new ArrayList<>();
+        for (JsonElement element : items) {
+            JsonObject item = element.getAsJsonObject();
+            int severity = item.has("severity") ? item.get("severity").getAsInt() : 1;
+            int code = item.has("code") && item.get("code").isJsonPrimitive() && item.get("code").getAsJsonPrimitive().isNumber()
+                    ? item.get("code").getAsInt() : 0;
+            result.add(new TsLanguageService.Diagnostic(range(item.getAsJsonObject("range")),
+                    severity == 1 ? "error" : severity == 2 ? "warning" : "suggestion", code, item.get("message").getAsString()));
+        }
+        return result;
+    }
+
+    /** WorkspaceEdit: "changes" {uri: TextEdit[]} or "documentChanges" [{textDocument, edits}]. */
+    private static @NotNull List<TsLanguageService.Edit> workspaceEdit(@NotNull JsonObject edit) {
+        List<TsLanguageService.Edit> result = new ArrayList<>();
+        try {
+            if (edit.has("changes")) {
+                for (Map.Entry<String, JsonElement> entry : edit.getAsJsonObject("changes").entrySet()) {
+                    Path file = Path.of(new URI(entry.getKey()));
+                    for (JsonElement e : entry.getValue().getAsJsonArray()) result.add(edit(file, e.getAsJsonObject()));
+                }
+            }
+            if (edit.has("documentChanges")) {
+                for (JsonElement change : edit.getAsJsonArray("documentChanges")) {
+                    JsonObject document = change.getAsJsonObject();
+                    if (!document.has("textDocument") || !document.has("edits")) continue; // create/rename/delete file
+                    Path file = Path.of(new URI(document.getAsJsonObject("textDocument").get("uri").getAsString()));
+                    for (JsonElement e : document.getAsJsonArray("edits")) result.add(edit(file, e.getAsJsonObject()));
+                }
+            }
+        } catch (Exception e) {
+            LOG.debug("Unsupported workspace edit " + edit, e);
+        }
+        return result;
+    }
+
+    private static @NotNull TsLanguageService.Edit edit(@NotNull Path file, @NotNull JsonObject textEdit) {
+        return new TsLanguageService.Edit(file, range(textEdit.getAsJsonObject("range")), textEdit.get("newText").getAsString());
+    }
+
+    private static @NotNull TsLanguageService.Range range(@NotNull JsonObject range) {
+        JsonObject start = range.getAsJsonObject("start");
+        JsonObject end = range.getAsJsonObject("end");
+        return new TsLanguageService.Range(start.get("line").getAsInt(), start.get("character").getAsInt(),
+                end.get("line").getAsInt(), end.get("character").getAsInt());
+    }
+
+    private static @NotNull JsonObject range(@NotNull TsLanguageService.Range range) {
+        JsonObject start = new JsonObject();
+        start.addProperty("line", range.line());
+        start.addProperty("character", range.character());
+        JsonObject end = new JsonObject();
+        end.addProperty("line", range.endLine());
+        end.addProperty("character", range.endCharacter());
+        JsonObject result = new JsonObject();
+        result.add("start", start);
+        result.add("end", end);
+        return result;
     }
 
     @Override

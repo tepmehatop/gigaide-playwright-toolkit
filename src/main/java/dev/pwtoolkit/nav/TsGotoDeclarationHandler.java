@@ -17,6 +17,7 @@ import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import dev.pwtoolkit.settings.PwSettings;
 import dev.pwtoolkit.util.JsFiles;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -55,6 +56,7 @@ public final class TsGotoDeclarationHandler implements GotoDeclarationHandler {
             LOG.debug("Definition request failed", e);
             return null;
         }
+        if (locations != null && locations.isEmpty()) locations = playwrightMembers(file, editor.getDocument(), offset);
         if (locations == null || locations.isEmpty()) return null;
 
         List<PsiElement> targets = new ArrayList<>();
@@ -63,6 +65,23 @@ public final class TsGotoDeclarationHandler implements GotoDeclarationHandler {
             if (target != null) targets.add(target);
         }
         return targets.isEmpty() ? null : targets.toArray(PsiElement.EMPTY_ARRAY);
+    }
+
+    /** TypeScript knows nothing about the receiver (an untyped parameter): Playwright's members with this name. */
+    private static @NotNull List<TsLanguageService.Location> playwrightMembers(VirtualFile file, Document document, int offset) {
+        CharSequence text = document.getImmutableCharSequence();
+        int start = offset;
+        int end = offset;
+        while (start > 0 && Character.isJavaIdentifierPart(text.charAt(start - 1))) start--;
+        while (end < text.length() && Character.isJavaIdentifierPart(text.charAt(end))) end++;
+        int before = start - 1;
+        while (before >= 0 && Character.isWhitespace(text.charAt(before))) before--;
+        if (start == end || before < 0 || text.charAt(before) != '.') return List.of();
+        List<TsLanguageService.Location> locations = new ArrayList<>();
+        for (PwApiIndex.Member member : PwApiIndex.find(file.toNioPath(), text.subSequence(start, end).toString())) {
+            locations.add(new TsLanguageService.Location(member.file(), member.line(), member.character()));
+        }
+        return locations;
     }
 
     private static @Nullable List<TsLanguageService.Location> await(CompletableFuture<List<TsLanguageService.Location>> future, int timeoutMs)
