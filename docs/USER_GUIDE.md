@@ -263,6 +263,28 @@ Tools
 | `pwpage` | класс Page Object в стиле проекта: `path`, `selectors`, конструктор, `open()` |
 
 | `log` | `console.log(…);` |
+| `pwgoto`, `pwclick`, `pwfill` | `await page.goto("/")`, `await page.locator("…").click()`, `.fill("…")` |
+| `pwrole`, `pwtid`, `pwtext`, `pwlabel` | `page.getByRole("button", { name: "…" })` и др. |
+| `pwvis`, `pwhave`, `pwurl`, `pwtitle`, `pwsoft`, `pwpoll` | проверки `expect(...)` |
+| `pwwait` | ожидание ответа API: промис до действия, `await` после |
+| `pwroute`, `pwapi` | мок ответа через `page.route`, запрос через фикстуру `request` |
+| `pwba`, `pwae`, `pwaa`, `pwonly`, `pwskip`, `pwfixme`, `pwdser`, `pwuse`, `pwslow`, `pwpause` | хуки и режимы тестов |
+| `pwshot`, `pwattach`, `pwann` | скриншот, вложение и аннотация в отчёт |
+
+**Шаблоны TypeScript/JavaScript** — как в WebStorm и сниппетах VS Code:
+
+| Сокращение | Что вставляет |
+|---|---|
+| `fori`, `itar`, `ritar` | цикл с индексом; по массиву (`const element = array[i]`); в обратном порядке |
+| `iter` / `forof`, `itin` / `forin`, `forawait`, `foreach` | `for…of`, `for…in`, `for await…of`, `array.forEach(...)` |
+| `ifelse`, `switchc`, `whilel`, `dowhile`, `trycatch`, `tryf`, `thr` | условия, циклы, `try/catch[/finally]`, `throw new Error()` |
+| `fn`, `afn`, `arrow`, `aarrow`, `constfn` | функции и стрелочные функции |
+| `cls`, `ctor`, `met`, `getter`, `setter`, `prop`, `intf`, `typ`, `enm` | классы и типы (`prop`, `intf`, `typ`, `enm` — только в TypeScript) |
+| `imp`, `impd`, `impa`, `expd`, `expc` | импорт и экспорт |
+| `st`, `si`, `sleep` | `setTimeout`, `setInterval`, `await` задержки |
+| `clg`, `logv`, `logj`, `logw`, `loge`, `logt`, `todo` | `console.*`, `JSON.stringify` значения, `// TODO:` |
+
+Шаблоны не срабатывают внутри строк, комментариев и после точки.
 
 **Постфиксные шаблоны**: допишите к выражению ключ и нажмите **Tab**:
 
@@ -276,7 +298,7 @@ Tools
 
 **Новый тест** — в окне Project правый клик по папке → **New → Playwright Test**: файл с нужным суффиксом (`.test.ts`/`.spec.ts`, как в проекте) и импортом `test`, `expect` из `baseTest.ts` проекта.
 
-Шаблоны можно поменять: **Settings → Editor → Live Templates → Playwright**; постфиксные — **Settings → Editor → General → Postfix Completion**.
+Шаблоны можно поменять: **Settings → Editor → Live Templates → Playwright** и **TypeScript/JavaScript (Playwright Toolkit)**; постфиксные — **Settings → Editor → General → Postfix Completion**.
 
 ## 11. Настройки
 

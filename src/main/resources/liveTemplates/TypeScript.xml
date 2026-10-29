@@ -1,0 +1,289 @@
+<templateSet group="TypeScript/JavaScript (Playwright Toolkit)">
+  <template name="fori" value="for (let $INDEX$ = 0; $INDEX$ &lt; $LIMIT$; $INDEX$++) {&#10;    $END$&#10;}" description="for loop with an index" toReformat="false" toShortenFQNames="false">
+    <variable name="INDEX" expression="" defaultValue="&quot;i&quot;" alwaysStopAt="true"/>
+    <variable name="LIMIT" expression="" defaultValue="" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="itar" value="for (let $INDEX$ = 0; $INDEX$ &lt; $ARRAY$.length; $INDEX$++) {&#10;    const $ELEMENT$ = $ARRAY$[$INDEX$];&#10;    $END$&#10;}" description="Iterate elements of an array" toReformat="false" toShortenFQNames="false">
+    <variable name="INDEX" expression="" defaultValue="&quot;i&quot;" alwaysStopAt="true"/>
+    <variable name="ARRAY" expression="" defaultValue="&quot;array&quot;" alwaysStopAt="true"/>
+    <variable name="ELEMENT" expression="" defaultValue="&quot;element&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="ritar" value="for (let $INDEX$ = $ARRAY$.length - 1; $INDEX$ &gt;= 0; $INDEX$--) {&#10;    const $ELEMENT$ = $ARRAY$[$INDEX$];&#10;    $END$&#10;}" description="Iterate elements of an array in reverse order" toReformat="false" toShortenFQNames="false">
+    <variable name="INDEX" expression="" defaultValue="&quot;i&quot;" alwaysStopAt="true"/>
+    <variable name="ARRAY" expression="" defaultValue="&quot;array&quot;" alwaysStopAt="true"/>
+    <variable name="ELEMENT" expression="" defaultValue="&quot;element&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="iter" value="for (const $ITEM$ of $ITERABLE$) {&#10;    $END$&#10;}" description="for...of loop" toReformat="false" toShortenFQNames="false">
+    <variable name="ITEM" expression="" defaultValue="&quot;item&quot;" alwaysStopAt="true"/>
+    <variable name="ITERABLE" expression="" defaultValue="&quot;items&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="itin" value="for (const $KEY$ in $OBJECT$) {&#10;    if (Object.prototype.hasOwnProperty.call($OBJECT$, $KEY$)) {&#10;        const $VALUE$ = $OBJECT$[$KEY$];&#10;        $END$&#10;    }&#10;}" description="for...in loop over own properties" toReformat="false" toShortenFQNames="false">
+    <variable name="KEY" expression="" defaultValue="&quot;key&quot;" alwaysStopAt="true"/>
+    <variable name="OBJECT" expression="" defaultValue="&quot;object&quot;" alwaysStopAt="true"/>
+    <variable name="VALUE" expression="" defaultValue="&quot;value&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="forof" value="for (const $ITEM$ of $ITERABLE$) {&#10;    $END$&#10;}" description="for...of loop" toReformat="false" toShortenFQNames="false">
+    <variable name="ITEM" expression="" defaultValue="&quot;item&quot;" alwaysStopAt="true"/>
+    <variable name="ITERABLE" expression="" defaultValue="&quot;items&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="forin" value="for (const $KEY$ in $OBJECT$) {&#10;    $END$&#10;}" description="for...in loop" toReformat="false" toShortenFQNames="false">
+    <variable name="KEY" expression="" defaultValue="&quot;key&quot;" alwaysStopAt="true"/>
+    <variable name="OBJECT" expression="" defaultValue="&quot;object&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="forawait" value="for await (const $ITEM$ of $ITERABLE$) {&#10;    $END$&#10;}" description="for await...of loop" toReformat="false" toShortenFQNames="false">
+    <variable name="ITEM" expression="" defaultValue="&quot;item&quot;" alwaysStopAt="true"/>
+    <variable name="ITERABLE" expression="" defaultValue="&quot;items&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="foreach" value="$ARRAY$.forEach(($ITEM$) =&gt; {&#10;    $END$&#10;});" description="array.forEach(...)" toReformat="false" toShortenFQNames="false">
+    <variable name="ARRAY" expression="" defaultValue="&quot;array&quot;" alwaysStopAt="true"/>
+    <variable name="ITEM" expression="" defaultValue="&quot;item&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="whilel" value="while ($CONDITION$) {&#10;    $END$&#10;}" description="while loop" toReformat="false" toShortenFQNames="false">
+    <variable name="CONDITION" expression="" defaultValue="" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="dowhile" value="do {&#10;    $END$&#10;} while ($CONDITION$);" description="do...while loop" toReformat="false" toShortenFQNames="false">
+    <variable name="CONDITION" expression="" defaultValue="" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="ifelse" value="if ($CONDITION$) {&#10;    $END$&#10;} else {&#10;    &#10;}" description="if...else" toReformat="false" toShortenFQNames="false">
+    <variable name="CONDITION" expression="" defaultValue="" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="switchc" value="switch ($VALUE$) {&#10;    case $CASE$:&#10;        $END$&#10;        break;&#10;    default:&#10;        break;&#10;}" description="switch with a case" toReformat="false" toShortenFQNames="false">
+    <variable name="VALUE" expression="" defaultValue="" alwaysStopAt="true"/>
+    <variable name="CASE" expression="" defaultValue="" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="trycatch" value="try {&#10;    $END$&#10;} catch ($ERROR$) {&#10;    &#10;}" description="try...catch" toReformat="false" toShortenFQNames="false">
+    <variable name="ERROR" expression="" defaultValue="&quot;error&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="tryf" value="try {&#10;    $END$&#10;} catch ($ERROR$) {&#10;    &#10;} finally {&#10;    &#10;}" description="try...catch...finally" toReformat="false" toShortenFQNames="false">
+    <variable name="ERROR" expression="" defaultValue="&quot;error&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="thr" value="throw new Error($MESSAGE$);" description="throw new Error(...)" toReformat="false" toShortenFQNames="false">
+    <variable name="MESSAGE" expression="" defaultValue="&quot;\&quot;\&quot;&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="fn" value="function $NAME$($PARAMS$) {&#10;    $END$&#10;}" description="function" toReformat="false" toShortenFQNames="false">
+    <variable name="NAME" expression="" defaultValue="&quot;name&quot;" alwaysStopAt="true"/>
+    <variable name="PARAMS" expression="" defaultValue="" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="afn" value="async function $NAME$($PARAMS$) {&#10;    $END$&#10;}" description="async function" toReformat="false" toShortenFQNames="false">
+    <variable name="NAME" expression="" defaultValue="&quot;name&quot;" alwaysStopAt="true"/>
+    <variable name="PARAMS" expression="" defaultValue="" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="arrow" value="($PARAMS$) =&gt; {&#10;    $END$&#10;}" description="arrow function" toReformat="false" toShortenFQNames="false">
+    <variable name="PARAMS" expression="" defaultValue="" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="aarrow" value="async ($PARAMS$) =&gt; {&#10;    $END$&#10;}" description="async arrow function" toReformat="false" toShortenFQNames="false">
+    <variable name="PARAMS" expression="" defaultValue="" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="constfn" value="const $NAME$ = async ($PARAMS$) =&gt; {&#10;    $END$&#10;};" description="const name = async (...) =&gt; {...}" toReformat="false" toShortenFQNames="false">
+    <variable name="NAME" expression="" defaultValue="&quot;name&quot;" alwaysStopAt="true"/>
+    <variable name="PARAMS" expression="" defaultValue="" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="cls" value="class $NAME$ {&#10;    constructor($PARAMS$) {&#10;        $END$&#10;    }&#10;}" description="class with a constructor" toReformat="false" toShortenFQNames="false">
+    <variable name="NAME" expression="" defaultValue="&quot;Name&quot;" alwaysStopAt="true"/>
+    <variable name="PARAMS" expression="" defaultValue="" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="ctor" value="constructor($PARAMS$) {&#10;    $END$&#10;}" description="constructor" toReformat="false" toShortenFQNames="false">
+    <variable name="PARAMS" expression="" defaultValue="" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="met" value="async $NAME$($PARAMS$) {&#10;    $END$&#10;}" description="async method of a class" toReformat="false" toShortenFQNames="false">
+    <variable name="NAME" expression="" defaultValue="&quot;name&quot;" alwaysStopAt="true"/>
+    <variable name="PARAMS" expression="" defaultValue="" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="getter" value="get $NAME$() {&#10;    return $END$;&#10;}" description="getter" toReformat="false" toShortenFQNames="false">
+    <variable name="NAME" expression="" defaultValue="&quot;name&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="setter" value="set $NAME$($VALUE$) {&#10;    $END$&#10;}" description="setter" toReformat="false" toShortenFQNames="false">
+    <variable name="NAME" expression="" defaultValue="&quot;name&quot;" alwaysStopAt="true"/>
+    <variable name="VALUE" expression="" defaultValue="&quot;value&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="imp" value="import { $MEMBER$ } from &quot;$MODULE$&quot;;$END$" description="import { member } from &quot;module&quot;" toReformat="false" toShortenFQNames="false">
+    <variable name="MODULE" expression="" defaultValue="" alwaysStopAt="true"/>
+    <variable name="MEMBER" expression="" defaultValue="" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="impd" value="import $NAME$ from &quot;$MODULE$&quot;;$END$" description="import default" toReformat="false" toShortenFQNames="false">
+    <variable name="MODULE" expression="" defaultValue="" alwaysStopAt="true"/>
+    <variable name="NAME" expression="" defaultValue="" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="impa" value="import * as $NAME$ from &quot;$MODULE$&quot;;$END$" description="import * as name" toReformat="false" toShortenFQNames="false">
+    <variable name="MODULE" expression="" defaultValue="" alwaysStopAt="true"/>
+    <variable name="NAME" expression="" defaultValue="" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="expd" value="export default $END$" description="export default" toReformat="false" toShortenFQNames="false">
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="expc" value="export const $NAME$ = $END$;" description="export const" toReformat="false" toShortenFQNames="false">
+    <variable name="NAME" expression="" defaultValue="&quot;name&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="st" value="setTimeout(() =&gt; {&#10;    $END$&#10;}, $DELAY$);" description="setTimeout" toReformat="false" toShortenFQNames="false">
+    <variable name="DELAY" expression="" defaultValue="&quot;1000&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="si" value="setInterval(() =&gt; {&#10;    $END$&#10;}, $DELAY$);" description="setInterval" toReformat="false" toShortenFQNames="false">
+    <variable name="DELAY" expression="" defaultValue="&quot;1000&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="sleep" value="await new Promise((resolve) =&gt; setTimeout(resolve, $DELAY$));$END$" description="await a delay" toReformat="false" toShortenFQNames="false">
+    <variable name="DELAY" expression="" defaultValue="&quot;1000&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="clg" value="console.log($END$);" description="console.log()" toReformat="false" toShortenFQNames="false">
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="logv" value="console.log(&quot;$EXPR$:&quot;, $EXPR$);$END$" description="console.log(&quot;name:&quot;, name)" toReformat="false" toShortenFQNames="false">
+    <variable name="EXPR" expression="" defaultValue="" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="logj" value="console.log(JSON.stringify($EXPR$, null, 2));$END$" description="console.log(JSON.stringify(value, null, 2))" toReformat="false" toShortenFQNames="false">
+    <variable name="EXPR" expression="" defaultValue="" alwaysStopAt="true"/>
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="logw" value="console.warn($END$);" description="console.warn()" toReformat="false" toShortenFQNames="false">
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="loge" value="console.error($END$);" description="console.error()" toReformat="false" toShortenFQNames="false">
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="logt" value="console.table($END$);" description="console.table()" toReformat="false" toShortenFQNames="false">
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="todo" value="// TODO: $END$" description="TODO comment" toReformat="false" toShortenFQNames="false">
+    <context>
+      <option name="PLAYWRIGHT" value="true"/>
+    </context>
+  </template>
+  <template name="intf" value="interface $NAME$ {&#10;    $END$&#10;}" description="interface" toReformat="false" toShortenFQNames="false">
+    <variable name="NAME" expression="" defaultValue="&quot;Name&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="PWTK_TYPESCRIPT" value="true"/>
+    </context>
+  </template>
+  <template name="typ" value="type $NAME$ = $END$;" description="type alias" toReformat="false" toShortenFQNames="false">
+    <variable name="NAME" expression="" defaultValue="&quot;Name&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="PWTK_TYPESCRIPT" value="true"/>
+    </context>
+  </template>
+  <template name="enm" value="enum $NAME$ {&#10;    $END$&#10;}" description="enum" toReformat="false" toShortenFQNames="false">
+    <variable name="NAME" expression="" defaultValue="&quot;Name&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="PWTK_TYPESCRIPT" value="true"/>
+    </context>
+  </template>
+  <template name="prop" value="private $NAME$: $TYPE$;$END$" description="private field" toReformat="false" toShortenFQNames="false">
+    <variable name="NAME" expression="" defaultValue="&quot;name&quot;" alwaysStopAt="true"/>
+    <variable name="TYPE" expression="" defaultValue="&quot;string&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="PWTK_TYPESCRIPT" value="true"/>
+    </context>
+  </template>
+</templateSet>

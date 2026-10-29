@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.14.0
+
+**Live templates для TS/JS и Playwright** — 83 шаблона, ставятся вместе с плагином. Набираете сокращение и нажимаете **Tab**:
+
+- как в WebStorm: `fori`, `itar`, `ritar`, `iter`, `itin`;
+- как в сниппетах VS Code:
+  - циклы и условия: `forof`, `forin`, `forawait`, `foreach`, `whilel`, `dowhile`, `ifelse`, `switchc`, `trycatch`, `tryf`, `thr`;
+  - функции и классы: `fn`, `afn`, `arrow`, `aarrow`, `constfn`, `cls`, `ctor`, `met`, `getter`, `setter`;
+  - импорт и экспорт: `imp`, `impd`, `impa`, `expd`, `expc`;
+  - таймеры и консоль: `st`, `si`, `sleep`, `clg`, `logv`, `logj`, `logw`, `loge`, `logt`, `todo`;
+  - только в TypeScript: `intf`, `typ`, `enm`, `prop`.
+- Playwright (вдобавок к `pwt`, `pwd`, `pwstep`, `pwbe`, `pwexp`, `pwloc`, `pwfix`, `pwpage`):
+  - тесты и хуки: `pwba`, `pwae`, `pwaa`, `pwonly`, `pwskip`, `pwfixme`, `pwdser`, `pwuse`, `pwslow`, `pwpause`;
+  - действия и локаторы: `pwgoto`, `pwclick`, `pwfill`, `pwrole`, `pwtid`, `pwtext`, `pwlabel`;
+  - проверки: `pwvis`, `pwhave`, `pwurl`, `pwtitle`, `pwsoft`, `pwpoll`;
+  - сеть: `pwwait` (сначала промис ответа, потом действие), `pwroute` (мок API), `pwapi` (запрос через `request`);
+  - отчёт: `pwshot`, `pwattach`, `pwann`.
+
+Шаблоны не срабатывают внутри строк, комментариев и после точки (`request.get`). Список и правка — Settings → Editor → Live Templates → *Playwright* и *TypeScript/JavaScript (Playwright Toolkit)*.
+
 ## 1.13.0
 
 **Pick Locator с ранжированием, как это делает автотестер.** Свой браузер для выбора (Chromium из Playwright проекта) с постоянным профилем: войти на стенд нужно один раз, логин сохраняется между выборами. Клик по элементу даёт варианты:

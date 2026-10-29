@@ -86,7 +86,9 @@
                                  id="dev.pwtoolkit.settings" displayName="Playwright Toolkit"/>
         <additionalTextAttributes scheme="Darcula" file="colorSchemes/PwToolkitDarcula.xml"/>
         <liveTemplateContext contextId="PLAYWRIGHT" implementation="dev.pwtoolkit.templates.PwTemplateContextType"/>
+        <liveTemplateContext contextId="PWTK_TYPESCRIPT" implementation="dev.pwtoolkit.templates.PwTemplateContextType$TypeScriptOnly"/>
         <defaultLiveTemplates file="/liveTemplates/Playwright.xml"/>
+        <defaultLiveTemplates file="/liveTemplates/TypeScript.xml"/>
         <notificationGroup id="Playwright Toolkit" displayType="BALLOON"/>
         <internalFileTemplate name="Playwright Test"/>
     </extensions>
