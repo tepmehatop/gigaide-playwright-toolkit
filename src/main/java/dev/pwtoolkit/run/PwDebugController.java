@@ -7,6 +7,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.intellij.openapi.diagnostic.Logger;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.net.URI;
@@ -46,6 +47,46 @@ public final class PwDebugController implements WebSocket.Listener {
         // makes the server report the number of open pages (stateChanged events)
         controller.send("setReportStateChanged", Map.of("enabled", true)).get(10, TimeUnit.SECONDS);
         return controller;
+    }
+
+    /** The element the user clicks in the browser while picking (inspectRequested: selector, locator, ariaSnapshot). */
+    private volatile java.util.function.Consumer<JsonObject> inspectListener;
+
+    /** A picked element: the locator code for the language (getByRole('button', { name: 'Sign in' })) and its selector. */
+    public record Picked(@NotNull String locator, @NotNull String selector) {
+    }
+
+    /**
+     * Pick Locator: the browser highlights the element under the mouse, a click picks it. Completes with the locator of
+     * the clicked element; the picking mode is switched off afterwards (also when the future is cancelled).
+     */
+    public @NotNull CompletableFuture<Picked> pickLocator(@Nullable String testIdAttribute) {
+        CompletableFuture<Picked> picked = new CompletableFuture<>();
+        inspectListener = params -> {
+            if (params.has("locator")) {
+                picked.complete(new Picked(params.get("locator").getAsString(),
+                        params.has("selector") ? params.get("selector").getAsString() : params.get("locator").getAsString()));
+            } else if (params.has("mode") && "none".equals(params.get("mode").getAsString())) {
+                picked.cancel(false); // switched off in the browser's own toolbar
+            }
+        };
+        Map<String, Object> mode = new java.util.HashMap<>();
+        mode.put("mode", "inspecting");
+        if (testIdAttribute != null) mode.put("testIdAttributeName", testIdAttribute);
+        send("setRecorderMode", mode).whenComplete((result, error) -> {
+            if (error != null) picked.completeExceptionally(error);
+        });
+        picked.whenComplete((result, error) -> {
+            inspectListener = null;
+            if (!closed) send("setRecorderMode", Map.of("mode", "none"));
+        });
+        return picked;
+    }
+
+    /** For tests: what the server sends when an element is clicked while picking. */
+    void onEvent(@NotNull String method, @NotNull JsonObject params) {
+        java.util.function.Consumer<JsonObject> listener = inspectListener;
+        if (listener != null && ("inspectRequested".equals(method) || "setModeRequested".equals(method))) listener.accept(params);
     }
 
     public int pageCount() {
@@ -104,10 +145,10 @@ public final class PwDebugController implements WebSocket.Listener {
 
     private void dispatch(@NotNull JsonObject message) {
         if (!message.has("id")) {
-            if ("stateChanged".equals(message.has("method") ? message.get("method").getAsString() : null)) {
-                JsonObject params = message.getAsJsonObject("params");
-                if (params != null && params.has("pageCount")) pageCount = params.get("pageCount").getAsInt();
-            }
+            String method = message.has("method") ? message.get("method").getAsString() : null;
+            JsonObject params = message.has("params") && message.get("params").isJsonObject() ? message.getAsJsonObject("params") : new JsonObject();
+            if ("stateChanged".equals(method) && params.has("pageCount")) pageCount = params.get("pageCount").getAsInt();
+            if (method != null) onEvent(method, params);
             return;
         }
         CompletableFuture<JsonElement> future = pending.remove(message.get("id").getAsInt());

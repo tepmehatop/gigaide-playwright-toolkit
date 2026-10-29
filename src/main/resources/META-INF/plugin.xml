@@ -33,6 +33,9 @@
         <typedHandler implementation="dev.pwtoolkit.completion.TsAutoPopupHandler"/>
         <findUsagesHandlerFactory implementation="dev.pwtoolkit.nav.TsFindUsagesHandlerFactory" order="first"/>
         <intentionMenuContributor implementation="dev.pwtoolkit.refactor.TsRefactorIntentions"/>
+        <annotator language="TypeScript" implementationClass="dev.pwtoolkit.run.PwSelectorAnnotator"/>
+        <annotator language="JavaScript" implementationClass="dev.pwtoolkit.run.PwSelectorAnnotator"/>
+        <annotator language="TSX" implementationClass="dev.pwtoolkit.run.PwSelectorAnnotator"/>
         <definitionsScopedSearch implementation="dev.pwtoolkit.nav.TsImplementationSearch"/>
         <callHierarchyProvider language="TypeScript" implementationClass="dev.pwtoolkit.nav.TsCallHierarchyProvider" order="first"/>
         <callHierarchyProvider language="JavaScript" implementationClass="dev.pwtoolkit.nav.TsCallHierarchyProvider" order="first"/>
@@ -111,6 +114,10 @@
             <separator/>
             <action id="dev.pwtoolkit.ShowReport" class="dev.pwtoolkit.tests.PwToolsActions$ShowReport"
                     text="Show Report" description="Open playwright-extended-report or the Playwright HTML report"/>
+            <action id="dev.pwtoolkit.PickLocator" class="dev.pwtoolkit.tests.PwPickLocatorAction"
+                    text="Pick Locator in Browser" description="Click an element in the browser kept open by Show Browser: its locator is inserted at the caret">
+                <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            </action>
             <action id="dev.pwtoolkit.Codegen" class="dev.pwtoolkit.tests.PwToolsActions$Codegen"
                     text="Record New Test (Codegen)..." description="Record browser actions as Playwright code"/>
             <action id="dev.pwtoolkit.InstallBrowsers" class="dev.pwtoolkit.tests.PwToolsActions$InstallBrowsers"

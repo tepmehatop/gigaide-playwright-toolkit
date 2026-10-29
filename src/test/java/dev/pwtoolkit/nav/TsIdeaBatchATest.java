@@ -84,10 +84,12 @@ public class TsIdeaBatchATest extends BasePlatformTestCase {
 
     public void testNewPlaywrightTestFollowsTheProject() {
         VirtualFile tests = sampleRoot.findFileByRelativePath("tests/login");
-        assertEquals(".test.ts", PwNewTestActionAccess.testSuffix(getProject()));
+        assertEquals(".test.ts", PwNewTestActionAccess.testSuffix(getProject(), tests));
         assertEquals("import test, { expect } from \"../baseTest\";", PwNewTestActionAccess.imports(getProject(), tests));
         assertEquals("Checkout flow", PwNewTestActionAccess.words("checkoutFlow"));
-        assertEquals("cart.test.ts", PwNewTestActionAccess.fileName("cart.spec.ts", ".test.ts"));
+        assertEquals("a typed suffix is kept", "cart.spec.ts", PwNewTestActionAccess.fileName("cart.spec.ts", ".test.ts"));
+        assertEquals("cart.test.ts", PwNewTestActionAccess.fileName("cart", ".test.ts"));
+        assertEquals("cart.test.ts", PwNewTestActionAccess.fileName("cart.ts", ".test.ts"));
     }
 
     private PsiElement[] typeOf(String needle) {

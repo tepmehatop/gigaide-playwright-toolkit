@@ -52,7 +52,7 @@ intellijPlatform {
     buildSearchableOptions = false
     instrumentCode = false
     pluginConfiguration {
-        changeNotes = "TypeScript refactorings on Alt+Enter, Extract Variable/Constant/Field/Method with in-place rename, Go to Implementation and Super, override gutter icons, Call Hierarchy. See CHANGELOG.md."
+        changeNotes = "Pick Locator in the browser, selector syntax checks (CSS, XPath, chains), debugger values inline, New Playwright Test follows testMatch. See CHANGELOG.md."
         ideaVersion {
             sinceBuild = "251"
             untilBuild = provider { null }

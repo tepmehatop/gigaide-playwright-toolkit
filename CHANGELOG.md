@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.12.0
+
+- **Pick Locator in Browser** (Tools → Playwright, контекстное меню редактора) — аналог Web Inspector из IDEA и «Pick locator» из VS Code:
+  - в браузере Show Browser элемент под мышью подсвечивается, клик выбирает его;
+  - локатор вставляется у курсора и копируется в буфер: внутри кавычек — селектор (`internal:role=button[name="Sign in"i]`), иначе код (`getByRole('button', { name: 'Sign in' })`);
+  - `testIdAttribute` из `playwright.config` учитывается.
+- **Проверка селекторов в коде** — ошибки подчёркиваются красным в `locator()`, `click()`, `fill()`, `waitForSelector()`… и в значениях объектов `selectors` / `locators` Page Object:
+  - XPath (`xpath=…`, `//…`) — сообщение движка XPath;
+  - CSS — незакрытые скобки и кавычки, лишние или висящие комбинаторы, пустые `#`/`.`, неверные `[атрибуты]`, `:` без псевдокласса;
+  - цепочки `>>`, `text=`, `role=`, `internal:` — по частям.
+- **Значения переменных прямо в строках кода при отладке**, как в IDEA: `user = {login: "admin", …}` серым в конце строки, где переменная объявлена или использована. Для переменных замыканий (фикстуры теста) — после раскрытия группы Closure. Включается в Settings → Build, Execution, Deployment → Debugger → Data Views → *Show values inline*.
+- **New → Playwright Test**: суффикс берётся из `testMatch` в `playwright.config` (`/.*\.test\.ts$/` → `.test.ts`); суффикс, введённый в имени вручную (`cart.spec.ts`), сохраняется.
+
 ## 1.11.0
 
 - **Alt+Enter без ошибки — рефакторинги TypeScript** для выделения или места под курсором: *Extract to constant / function / method / readonly field*, *Convert to async function*, *Add / Remove braces from arrow function*, *Convert to template string*, *Convert named / default export*, *Move to a new file* и другие.

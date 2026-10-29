@@ -8,8 +8,8 @@ public final class PwNewTestActionAccess {
     private PwNewTestActionAccess() {
     }
 
-    public static String testSuffix(Project project) {
-        return PwNewTestAction.testSuffix(project);
+    public static String testSuffix(Project project, VirtualFile directory) {
+        return PwNewTestAction.testSuffix(project, directory);
     }
 
     public static String imports(Project project, VirtualFile directory) {

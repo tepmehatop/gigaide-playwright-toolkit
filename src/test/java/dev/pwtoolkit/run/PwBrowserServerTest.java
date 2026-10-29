@@ -57,6 +57,27 @@ public class PwBrowserServerTest extends BasePlatformTestCase {
         assertEquals("Close Browser closes it", 0, chromeProcesses());
     }
 
+    /** Pick Locator: Playwright accepts the picking mode; a click (inspectRequested) gives the locator, the mode is switched off. */
+    public void testPickLocatorMode() throws Exception {
+        File sample = new File(System.getProperty("pwtoolkit.sample"));
+        String node = dev.pwtoolkit.util.NodeLocator.findNode(null);
+        String cli = PwLaunchSpec.findCli(sample.toPath());
+        PwBrowserServer.getInstance(getProject()).ensureStarted(sample, node, cli);
+        PwDebugController controller = PwBrowserServer.getInstance(getProject()).controller();
+        assertNotNull(controller);
+        var picked = controller.pickLocator("data-testid");
+        Thread.sleep(8000); // the server launches a browser and a page for picking
+        assertFalse("setRecorderMode rejected: " + picked, picked.isCompletedExceptionally());
+        var params = new com.google.gson.JsonObject();
+        params.addProperty("selector", "internal:role=button[name=\"Sign in\"i]");
+        params.addProperty("locator", "getByRole('button', { name: 'Sign in' })");
+        params.addProperty("ariaSnapshot", "- button \"Sign in\"");
+        controller.onEvent("inspectRequested", params);
+        assertEquals("getByRole('button', { name: 'Sign in' })", picked.get(5, java.util.concurrent.TimeUnit.SECONDS).locator());
+        // the mode is switched off: highlighting still works afterwards
+        controller.highlight("locator('body')").get(30, java.util.concurrent.TimeUnit.SECONDS);
+    }
+
     private static ProcessOutput run(PwLaunchSpec spec, List<String> args) throws Exception {
         GeneralCommandLine line = new GeneralCommandLine(spec.node(), spec.cli()).withParameters(args)
                 .withWorkDirectory(spec.workDir()).withEnvironment(spec.env())

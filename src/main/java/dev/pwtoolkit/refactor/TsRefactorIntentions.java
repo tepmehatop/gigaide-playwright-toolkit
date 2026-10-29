@@ -28,7 +28,7 @@ public final class TsRefactorIntentions implements IntentionMenuContributor {
                                int passIdToShowIntentionsFor, int offset) {
         if (!PwSettings.getInstance().getState().navigationEnabled) return;
         VirtualFile file = hostFile.getOriginalFile().getVirtualFile();
-        if (!JsFiles.isScript(file) || !file.isInLocalFileSystem()) return;
+        if (!JsFiles.isScript(file) || !JsFiles.isOnDisk(file)) return;
         SelectionModel selection = hostEditor.getSelectionModel();
         int start = selection.hasSelection() ? selection.getSelectionStart() : offset;
         int end = selection.hasSelection() ? selection.getSelectionEnd() : offset;

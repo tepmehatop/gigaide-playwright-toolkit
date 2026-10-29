@@ -26,6 +26,8 @@ final class PwValue extends XNamedValue {
     private final @Nullable String type;
     private final int reference;
     private final @Nullable String evaluateName;
+    /** Where the frame of this local variable is paused: for showing the value inline in the editor. */
+    private volatile @Nullable com.intellij.xdebugger.XSourcePosition frame;
 
     PwValue(@NotNull PwDebugProcess.DapSession session, @NotNull String name, @NotNull String value,
             @Nullable String type, int reference, @Nullable String evaluateName) {
@@ -86,6 +88,40 @@ final class PwValue extends XNamedValue {
     static @NotNull String stripAnsi(@NotNull String text) {
         // the ESC character itself, or its escaped spelling inside a JS string literal ("\x1b[2m", "\u001b[2m")
         return text.replaceAll("(?:\u001b|\\\\x1b|\\\\u001b)\\[[0-9;]*m", "");
+    }
+
+    /** Marks a variable of the paused frame (not a child of an object), so that its value is shown inline. */
+    @NotNull PwValue atFrame(@Nullable com.intellij.xdebugger.XSourcePosition position) {
+        this.frame = position;
+        return this;
+    }
+
+    /**
+     * "Show values inline" (like IntelliJ IDEA): the value is shown at the end of the closest line at or above the paused
+     * line where the variable is mentioned (declared, assigned or used), within the visible function.
+     */
+    @Override
+    public @NotNull com.intellij.util.ThreeState computeInlineDebuggerData(@NotNull com.intellij.xdebugger.frame.XInlineDebuggerDataCallback callback) {
+        com.intellij.xdebugger.XSourcePosition position = frame;
+        if (position == null || getName().equals("this")) return com.intellij.util.ThreeState.UNSURE;
+        Integer line = com.intellij.openapi.application.ApplicationManager.getApplication().runReadAction(
+                (com.intellij.openapi.util.Computable<Integer>) () -> lineMentioning(position, getName()));
+        if (line == null) return com.intellij.util.ThreeState.NO;
+        callback.computed(com.intellij.xdebugger.XDebuggerUtil.getInstance().createPosition(position.getFile(), line));
+        return com.intellij.util.ThreeState.YES;
+    }
+
+    /** The closest line at or above the paused one with the name as an identifier (not as a member after '.'). */
+    static @Nullable Integer lineMentioning(@NotNull com.intellij.xdebugger.XSourcePosition position, @NotNull String name) {
+        com.intellij.openapi.editor.Document document = com.intellij.openapi.fileEditor.FileDocumentManager.getInstance().getDocument(position.getFile());
+        if (document == null || position.getLine() >= document.getLineCount()) return null;
+        java.util.regex.Pattern identifier = java.util.regex.Pattern.compile("(?<![\\w$.])" + java.util.regex.Pattern.quote(name) + "(?![\\w$])");
+        CharSequence text = document.getImmutableCharSequence();
+        for (int line = position.getLine(); line >= 0 && line > position.getLine() - 300; line--) {
+            CharSequence lineText = text.subSequence(document.getLineStartOffset(line), document.getLineEndOffset(line));
+            if (identifier.matcher(lineText).find()) return line;
+        }
+        return null;
     }
 
     @NotNull String getValueText() {

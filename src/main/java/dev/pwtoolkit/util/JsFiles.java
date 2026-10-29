@@ -23,6 +23,11 @@ public final class JsFiles {
         return SCRIPT_EXTENSIONS.contains(ext);
     }
 
+    /** A real file on disk (the TypeScript server reads it); test and in-memory file systems may look local but are not. */
+    public static boolean isOnDisk(@Nullable VirtualFile file) {
+        return file != null && file.isInLocalFileSystem() && file.getFileSystem().getNioPath(file) != null;
+    }
+
     /** LSP languageId for a file name. */
     public static @NotNull String languageId(@NotNull String name) {
         String lower = StringUtil.toLowerCase(name);
