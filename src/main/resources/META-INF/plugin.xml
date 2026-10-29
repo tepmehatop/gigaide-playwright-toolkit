@@ -115,9 +115,11 @@
             <action id="dev.pwtoolkit.ShowReport" class="dev.pwtoolkit.tests.PwToolsActions$ShowReport"
                     text="Show Report" description="Open playwright-extended-report or the Playwright HTML report"/>
             <action id="dev.pwtoolkit.PickLocator" class="dev.pwtoolkit.tests.PwPickLocatorAction"
-                    text="Pick Locator in Browser" description="Click an element in the browser kept open by Show Browser: its locator is inserted at the caret">
+                    text="Pick Locator in Browser" description="Click an element in the Pick Locator browser: unique locators, best first, inserted at the caret">
                 <add-to-group group-id="EditorPopupMenu" anchor="last"/>
             </action>
+            <action id="dev.pwtoolkit.PickLocatorOpenPage" class="dev.pwtoolkit.tests.PwPickLocatorAction$OpenPage"
+                    text="Open Page in Pick Locator Browser..." description="Open a page (and log in) in the browser of Pick Locator"/>
             <action id="dev.pwtoolkit.Codegen" class="dev.pwtoolkit.tests.PwToolsActions$Codegen"
                     text="Record New Test (Codegen)..." description="Record browser actions as Playwright code"/>
             <action id="dev.pwtoolkit.InstallBrowsers" class="dev.pwtoolkit.tests.PwToolsActions$InstallBrowsers"

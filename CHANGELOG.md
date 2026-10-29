@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.13.0
+
+**Pick Locator с ранжированием, как это делает автотестер.** Свой браузер для выбора (Chromium из Playwright проекта) с постоянным профилем: войти на стенд нужно один раз, логин сохраняется между выборами. Клик по элементу даёт варианты:
+
+1. **Правило №1 — уникальность на странице**: каждый вариант проверяется на открытой странице, повторяющиеся не предлагаются.
+2. Дальше по качеству:
+   1. `[data-qa="login-field"]` (и `data-test`, `data-cy`, `data-e2e`);
+   2. `[data-testid="submit-btn"]` — только если уникален (его часто повторяют unit-тесты фронта);
+   3. `#username` / `[id="submit-form"]` (сгенерированные id вроде `:r1:` пропускаются);
+   4. `input[name="email"]`, короткий `.main-nav-link` (без хешей CSS-модулей);
+   5. `getByRole('button', { name: 'Войти' })`, `getByPlaceholder(...)` — уникальность проверяет сам Playwright;
+   6. `//button[contains(text(), 'Сохранить')]`;
+   7. внутри уникального родителя: `#login-form input[name="password"]`;
+   8. если уникального нет совсем — по позиции, с пометкой.
+3. Один вариант вставляется сразу; несколько — список, лучший первым.
+
+Порядок атрибутов — Settings → Tools → Playwright Toolkit → *Pick Locator: test attributes*; `testIdAttribute` из `playwright.config` учитывается. Show Browser для выбора больше не нужен. Новый пункт Tools → Playwright → *Open Page in Pick Locator Browser…*; при первом выборе плагин предлагает открыть `baseURL` из конфига.
+
 ## 1.12.0
 
 - **Pick Locator in Browser** (Tools → Playwright, контекстное меню редактора) — аналог Web Inspector из IDEA и «Pick locator» из VS Code:

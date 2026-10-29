@@ -52,7 +52,7 @@ intellijPlatform {
     buildSearchableOptions = false
     instrumentCode = false
     pluginConfiguration {
-        changeNotes = "Pick Locator in the browser, selector syntax checks (CSS, XPath, chains), debugger values inline, New Playwright Test follows testMatch. See CHANGELOG.md."
+        changeNotes = "Pick Locator ranks locators like an autotest engineer: unique on the page first, then data-qa, data-testid, id, name/class, role, XPath; own browser with a persistent profile. See CHANGELOG.md."
         ideaVersion {
             sinceBuild = "251"
             untilBuild = provider { null }
