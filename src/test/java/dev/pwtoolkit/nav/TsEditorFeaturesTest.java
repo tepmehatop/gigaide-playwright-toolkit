@@ -116,10 +116,33 @@ public class TsEditorFeaturesTest extends BasePlatformTestCase {
                 (Computable<CompletableFuture<List<TsLanguageService.Reference>>>) () ->
                         TsLanguageService.getInstance(getProject()).references(myFixture.getFile().getVirtualFile(), document, offset));
         List<TsLanguageService.Reference> references = future.get(30, TimeUnit.SECONDS);
+        FileDocumentManager.getInstance().saveDocument(document);
+        document = null;
         List<String> files = references.stream().map(r -> r.file().getFileName().toString()).toList();
         assertTrue(files.toString(), files.contains("login.test.ts"));
         assertTrue(files.toString(), files.contains("loginPage.page.ts"));
-        assertEquals(references.size(), TsFindUsagesAction.usages(getProject(), references).size());
+
+        // the IDE's own Find Usages / Show Usages: the target of a usage is resolved with the server
+        open("tests/login/login.test.ts", "", "");
+        myFixture.getEditor().getCaretModel().moveToOffset(document.getText().indexOf("login(user.login") + 1);
+        PsiElement target = com.intellij.codeInsight.TargetElementUtil.findTargetElement(myFixture.getEditor(),
+                com.intellij.codeInsight.TargetElementUtil.getInstance().getAllAccepted());
+        assertNotNull("usage is not resolved", target);
+        assertEquals("loginPage.page.ts", target.getContainingFile().getName());
+        var usages = myFixture.findUsages(target);
+        assertTrue(usages.toString(), usages.stream().anyMatch(u -> u.getFile() != null && u.getFile().getName().equals("login.test.ts")));
+        assertFalse("the declaration itself is not a usage", usages.stream().anyMatch(u -> u.getFile() != null
+                && u.getFile().getName().equals("loginPage.page.ts") && u.getNavigationOffset() == target.getTextOffset()));
+
+        // highlighting of usages under the caret
+        var handler = new TsFindUsagesHandlerFactory().createFindUsagesHandler(target, true);
+        var highlighted = handler.findReferencesToHighlight(target, new com.intellij.psi.search.LocalSearchScope(myFixture.getFile()));
+        assertEquals(1, highlighted.size());
+
+        // Ctrl+Click on the declaration: no target from the plugin, the IDE shows usages
+        open("pages/loginPage.page.ts", "", "");
+        int declaration = document.getText().indexOf("login(login: string") + 1;
+        assertNull(new TsGotoDeclarationHandler().getGotoDeclarationTargets(myFixture.getFile().findElementAt(declaration), declaration, myFixture.getEditor()));
     }
 
     public void testStructureOfPageObjectAndTest() {

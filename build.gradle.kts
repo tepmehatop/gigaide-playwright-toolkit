@@ -52,7 +52,7 @@ intellijPlatform {
     buildSearchableOptions = false
     instrumentCode = false
     pluginConfiguration {
-        changeNotes = "Parameter info on click and after comma, parameter name hints, Find Usages (Alt+F7) and Structure (Cmd+F12) from the TypeScript server. See CHANGELOG.md."
+        changeNotes = "IDEA-like navigation: Ctrl+Click on a declaration shows usages, Show Usages, Find Usages, usages highlighting, Quick Definition - targets resolved with the TypeScript server. See CHANGELOG.md."
         ideaVersion {
             sinceBuild = "251"
             untilBuild = provider { null }
