@@ -60,6 +60,41 @@
 - Как `debugHighlight.ts`: плагин вычисляет выражение локатора в кадре отладчика (`evaluate` — только строка селектора, без async-вызовов) и отправляет его в переиспользуемый браузер (`locator.highlight()`).
 - Без паузы (просто в редакторе) — подсветка в открытом браузере по наведению на селектор из `selectors` Page Object.
 
+## Этап 3 — «как в IntelliJ IDEA» (редактор TS/JS)
+
+Сделано (1.5.0–1.9.0):
+- автодополнение с автоимпортом;
+- ошибки TypeScript с подсказкой и Alt+Enter;
+- подсказка параметров (по клику в скобки и после запятой) и подсказки имён параметров;
+- документация при наведении и Ctrl+Q;
+- Find Usages и Show Usages, Ctrl+Click на объявлении, подсветка вхождений, Quick Definition;
+- Structure;
+- `log` / `.log`.
+
+Дальше, по порядку:
+1. **Type Info (Ctrl+Shift+P)** — тип выражения под курсором.
+2. **Go to Type Declaration (Cmd+Shift+B)** — к классу или интерфейсу типа: `page` → `Page`.
+3. **Постфиксные шаблоны IDEA**: `.const`, `.let`, `.if`, `.not`, `.return`, `.await`, `.for`, `.forof`, `.notnull`.
+4. **Code Vision** — «N usages» над функциями, методами и фикстурами.
+5. **Intentions без ошибки (Alt+Enter)** — рефакторинги TypeScript: *Convert to async function*, *Add braces to arrow function*, *Convert to template string* и др.
+6. **Extract Variable / Method / Constant (Cmd+Alt+V/M/C)**.
+7. **Go to Implementation (Cmd+Alt+B), Go to Super (Cmd+U)**, значки переопределения в gutter.
+8. **Call Hierarchy (Ctrl+Alt+H)**.
+9. Отладчик: значения переменных прямо в строках кода (inline values) — проверить и доделать.
+
+Бэклог (по решению пользователя): Rename (Shift+F6), Reformat Code, Optimize Imports.
+
+## Этап 4 — из Test Automation / справки JetBrains по Playwright
+
+Уже есть: запуск и отладка из gutter, конфигурация, дерево результатов, перезапуск упавших, HTML-отчёт, headed-режим.
+
+Не хватает:
+1. **New → Playwright Test** — файл теста по шаблону (с выбором фикстур из `baseTest`).
+2. **Подсветка и проверка селекторов** в строках `locator("…")`: CSS и XPath (синтаксис, ошибки), подсказка «N совпадений» на открытой странице (через Show Browser).
+3. **Web Inspector / Pick Locator** — выбрать элемент в браузере и вставить локатор в код (по роли, test-id, CSS, XPath); шаблон генерации локатора в Settings | Editor | File and Code Templates. Сейчас в бэклоге как «pick locator».
+4. **Новый проект Playwright** через `create-playwright`.
+5. Свёрнутые фреймы Playwright в стеке консоли.
+
 ## Отложено, в самом конце
 
 - Watch mode (перезапуск по сохранению) — частично заменяется «Open UI Mode» (`playwright test --ui`).
