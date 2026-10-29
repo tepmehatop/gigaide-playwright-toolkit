@@ -28,6 +28,8 @@ public final class PwSettings implements PersistentStateComponent<PwSettings.Sta
         public boolean semanticHighlighting = true;
         /** Code completion from the TypeScript server (GigaIDE knows no types from node_modules, e.g. Playwright's Page). */
         public boolean completion = true;
+        /** TypeScript errors and warnings in the editor, with quick fixes (Add import...). */
+        public boolean diagnostics = true;
         public boolean showBrowserWhenDebugging = true;
         public boolean pauseOnFailure = true;
         public boolean disableGigaJestMarker = true;

@@ -52,7 +52,7 @@ intellijPlatform {
     buildSearchableOptions = false
     instrumentCode = false
     pluginConfiguration {
-        changeNotes = "Code completion from the TypeScript server (page., locator., fixtures, keywords), log / .log templates, goto diagnostics. See CHANGELOG.md."
+        changeNotes = "TypeScript errors in the editor with quick fixes (Alt+Enter: Add import), auto-import in completion, Playwright API for untyped receivers. See CHANGELOG.md."
         ideaVersion {
             sinceBuild = "251"
             untilBuild = provider { null }

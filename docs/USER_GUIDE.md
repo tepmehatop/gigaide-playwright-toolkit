@@ -47,6 +47,11 @@ Project: ~/projects/autotests
 - методы самого Playwright (`page.locator`, `page.fill`, `page.waitForResponse`, `locator.innerText`…) — в `types.d.ts` из `node_modules`.
 
 **Автодополнение** (Ctrl+Space, после `.` открывается само): члены `page.`, `locator.`, фикстур и Page Object, ключевые слова (`await`, `const`), глобальные имена (`console`). Варианты даёт тот же TypeScript-сервер, что и переходы. У методов сразу добавляются скобки, курсор ставится внутрь.
+Функции из других файлов проекта тоже предлагаются (справа видно, откуда, например `../../utils/customHelpers`): при выборе импорт добавляется в начало файла.
+
+**Ошибки TypeScript** подчёркиваются в редакторе: неимпортированная функция, опечатка в имени метода, неверный тип аргумента. Подсказка — при наведении, F2 — к следующей ошибке. **Alt+Enter** на ошибке предлагает исправления TypeScript: *Add import from …*, *Add missing function declaration …* и другие.
+
+**Параметры без типа** — `function selectFromDropDown(page, locator) { await page.click(locator) }`: TypeScript не знает, что `page` — это Page. Тогда, как в IntelliJ, плагин ищет метод по имени в Playwright: Ctrl+Click на `click` предлагает `Page.click`, `Locator.click`…, после `page.` предлагаются методы Playwright. Для точной навигации и проверки типов укажите тип: `page: Page` (`import { Page } from "@playwright/test"`) — с `strict` в tsconfig TypeScript и так подчеркнёт параметр без типа.
 
 **Подсветка** работает в тестах так же, как в WebStorm (на снимке — тема Darcula):
 
@@ -243,7 +248,7 @@ Tools
 | Пути к Node.js, TypeScript (tsc/tsgo TS 7 или tsserver.js TS 5/6), vscode-js-debug | пусто — ищутся автоматически (найденный путь показан под полем) |
 | TypeScript server: Auto / Native TypeScript 7 / tsserver.js / typescript-language-server | значение сборки (auto, tsserver или tsls) |
 | Go to Declaration через TypeScript-сервер | вкл. |
-| Code completion from TypeScript | вкл. |
+| Code completion from TypeScript, TypeScript errors in the editor | вкл. |
 | Semantic highlighting, Rainbow brackets | вкл. |
 | Не заходить в код Playwright при step into | вкл. |
 | Show browser and keep it open between runs | выкл. |

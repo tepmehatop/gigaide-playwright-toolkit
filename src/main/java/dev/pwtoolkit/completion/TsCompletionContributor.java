@@ -12,6 +12,8 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.vfs.VirtualFile;
+import dev.pwtoolkit.nav.PwApiIndex;
+import dev.pwtoolkit.nav.TsEdits;
 import dev.pwtoolkit.nav.TsLanguageService;
 import dev.pwtoolkit.settings.PwSettings;
 import dev.pwtoolkit.util.JsFiles;
@@ -62,24 +64,62 @@ public final class TsCompletionContributor extends CompletionContributor {
         if (completions == null) return;
 
         CompletionResultSet ours = result.withPrefixMatcher(prefix);
+        // tsserver offers the words of the file ("warning" entries) when it knows nothing about the receiver
+        boolean untypedReceiver = completions.stream().allMatch(c -> c.kind().equals("word"));
+        if (untypedReceiver && trigger != null) {
+            // an untyped receiver (e.g. a parameter without a type): Playwright's members, like IntelliJ's weak completion
+            for (PwApiIndex.Member member : PwApiIndex.completionMembers(file.toNioPath())) {
+                if (fromIde.contains(member.name()) || !ours.getPrefixMatcher().prefixMatches(member.name())) continue;
+                LookupElementBuilder element = LookupElementBuilder.create(member.name())
+                        .withIcon(member.method() ? AllIcons.Nodes.Method : AllIcons.Nodes.Property)
+                        .withTypeText(member.owner(), true);
+                if (member.method()) {
+                    element = element.withTailText("()", true).withInsertHandler(ParenthesesInsertHandler.getInstance(true));
+                }
+                ours.addElement(PrioritizedLookupElement.withPriority(element, -100));
+            }
+            return;
+        }
         for (TsLanguageService.Completion completion : completions) {
             String name = completion.name();
+            if (completion.kind().equals("word")) continue;
             if (fromIde.contains(name) || !ours.getPrefixMatcher().prefixMatches(name)) continue;
             // e.g. ["data-id"] or ?.x: rewrites text before the caret, not supported here
             if (completion.insertText() != null && !completion.insertText().equals(name)) continue;
-            LookupElementBuilder element = LookupElementBuilder.create(name)
+            boolean callable = completion.kind().equals("method") || completion.kind().equals("function");
+            LookupElementBuilder element = LookupElementBuilder.create(completion, name)
                     .withIcon(icon(completion.kind()))
-                    .withTypeText(completion.kind().equals("other") ? null : completion.kind(), true);
-            if (completion.kind().equals("method") || completion.kind().equals("function")) {
-                element = element.withTailText("()", true).withInsertHandler(ParenthesesInsertHandler.getInstance(true));
-            }
+                    .withTypeText(completion.isAutoImport() ? completion.source() : completion.kind().equals("other") ? null : completion.kind(), true);
+            if (callable) element = element.withTailText("()", true);
+            if (callable || completion.isAutoImport()) element = element.withInsertHandler(new Insert(file, callable));
             ours.addElement(PrioritizedLookupElement.withPriority(element, priority(completion)));
+        }
+    }
+
+    /** Parentheses for methods, the import for an item from another module (asked from the server after insertion). */
+    private record Insert(@NotNull VirtualFile file, boolean callable) implements com.intellij.codeInsight.completion.InsertHandler<com.intellij.codeInsight.lookup.LookupElement> {
+        @Override
+        public void handleInsert(@NotNull com.intellij.codeInsight.completion.InsertionContext context,
+                                 @NotNull com.intellij.codeInsight.lookup.LookupElement item) {
+            int nameStart = context.getStartOffset();
+            if (callable) ParenthesesInsertHandler.getInstance(true).handleInsert(context, item);
+            if (!(item.getObject() instanceof TsLanguageService.Completion completion) || !completion.isAutoImport()) return;
+            context.commitDocument();
+            CompletableFuture<List<TsLanguageService.Edit>> future = TsLanguageService.getInstance(context.getProject())
+                    .completionEdits(file, context.getDocument(), nameStart, completion);
+            if (future == null) return;
+            try {
+                TsEdits.applyInWriteAction(future.get(TIMEOUT_MS, TimeUnit.MILLISECONDS));
+            } catch (Exception e) {
+                LOG.info("[pwtoolkit] import for " + completion.name() + " from " + completion.source() + " failed", e);
+            }
         }
     }
 
     /** TypeScript sorts by sortText ("11" own members before "12" inherited ones, "15" globals...): lower first. */
     private static double priority(@NotNull TsLanguageService.Completion completion) {
-        String sort = completion.sortText();
+        // typescript-language-server prefixes it with \uffff
+        String sort = completion.sortText().replaceFirst("^[^0-9]+", "");
         int digits = 0;
         while (digits < sort.length() && digits < 6 && Character.isDigit(sort.charAt(digits))) digits++;
         return digits == 0 ? 0 : -Double.parseDouble(sort.substring(0, digits));
@@ -96,8 +136,9 @@ public final class TsCompletionContributor extends CompletionContributor {
             } catch (ProcessCanceledException e) {
                 throw e;
             } catch (Exception e) {
+                // tsserver answers "No content available" when it has nothing to offer (e.g. after an untyped receiver)
                 LOG.debug("Completion request failed", e);
-                return null;
+                return List.of();
             }
         }
     }

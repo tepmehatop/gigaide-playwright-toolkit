@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.6.0
+
+- **Ошибки TypeScript в редакторе**: красное подчёркивание и подсказка при наведении, F2 переходит к следующей ошибке — например, `Cannot find name 'selectFromDropDown'` для неимпортированной функции. Неиспользуемое показывается серым. JS-плагин GigaIDE таких ошибок не показывает. Отключается в настройках (*TypeScript errors in the editor*).
+- **Alt+Enter**: исправления от TypeScript — *Add import from "../../utils/customHelpers"*, *Add missing function declaration*, *Infer parameter types from usage* и другие.
+- **Автоимпорт в автодополнении**: функции и классы из других файлов проекта предлагаются при наборе (справа — откуда), а при выборе импорт добавляется сам.
+- **Методы Playwright у параметров без типа** (`function select(page, locator) { page.click(locator) }`), как в IntelliJ:
+  - Ctrl+Click ведёт к `Page.click`, `Locator.click`… — при нескольких вариантах IDE показывает список;
+  - после `page.` предлагаются методы Page, Locator и других классов Playwright;
+  - такие вызовы подсвечиваются цветом методов.
+- Подсветка открытых файлов обновляется, когда TypeScript-сервер присылает новые ошибки.
+
 ## 1.5.0
 
 - **Автодополнение от TypeScript-сервера**: после `page.`, `locator.`, фикстуры или Page Object — методы и свойства Playwright (`waitForResponse`, `waitForTimeout`, `innerText`…), ключевые слова (`await`) и глобальные имена (`console`). JS-плагин GigaIDE не знает типов из `node_modules`, поэтому сам ничего не предлагает. Список открывается после `.`, у методов добавляются скобки. Работает со всеми тремя серверами (TS 7, `tsserver.js`, typescript-language-server); отключается в настройках (*Code completion from TypeScript*).

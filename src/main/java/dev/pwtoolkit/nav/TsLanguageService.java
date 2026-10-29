@@ -95,7 +95,54 @@ public final class TsLanguageService implements Disposable {
      * A completion item. kind: method, function, property, variable, constant, class, interface, enum, enumMember,
      * module, keyword, typeParameter or other. sortText orders the items like the TypeScript server does.
      */
-    public record Completion(@NotNull String name, @NotNull String kind, @NotNull String sortText, @Nullable String insertText) {
+    public record Completion(@NotNull String name, @NotNull String kind, @NotNull String sortText, @Nullable String insertText,
+                             @Nullable String source, @Nullable com.google.gson.JsonElement data) {
+        public Completion(@NotNull String name, @NotNull String kind, @NotNull String sortText, @Nullable String insertText) {
+            this(name, kind, sortText, insertText, null, null);
+        }
+
+        /** An auto-import: the item comes from another module, inserting it adds an import. */
+        public boolean isAutoImport() {
+            return source != null;
+        }
+    }
+
+    /** 0-based lines, UTF-16 characters. */
+    public record Range(int line, int character, int endLine, int endCharacter) {
+    }
+
+    /** severity: error, warning or suggestion. */
+    public record Diagnostic(@NotNull Range range, @NotNull String severity, int code, @NotNull String message) {
+    }
+
+    public record Edit(@NotNull Path file, @NotNull Range range, @NotNull String newText) {
+    }
+
+    public record Fix(@NotNull String title, @NotNull List<Edit> edits) {
+    }
+
+    /** Must be called inside a read action. Null when no server is available for the file. */
+    public @Nullable CompletableFuture<List<Edit>> completionEdits(@NotNull VirtualFile file, @NotNull Document document, int offset,
+                                                                   @NotNull Completion completion) {
+        Server server = serverFor(file);
+        if (server == null) return null;
+        int line = document.getLineNumber(offset);
+        int character = offset - document.getLineStartOffset(line);
+        return server.update(file, document).thenCompose(ignored -> server.backend.completionEdits(file.toNioPath(), line, character, completion));
+    }
+
+    /** Must be called inside a read action. Null when no server is available for the file. */
+    public @Nullable CompletableFuture<List<Diagnostic>> diagnostics(@NotNull VirtualFile file, @NotNull Document document) {
+        Server server = serverFor(file);
+        if (server == null) return null;
+        return server.update(file, document).thenCompose(ignored -> server.backend.diagnostics(file.toNioPath()));
+    }
+
+    /** Must be called inside a read action. Null when no server is available for the file. */
+    public @Nullable CompletableFuture<List<Fix>> fixes(@NotNull VirtualFile file, @NotNull Document document, @NotNull Diagnostic diagnostic) {
+        Server server = serverFor(file);
+        if (server == null) return null;
+        return server.update(file, document).thenCompose(ignored -> server.backend.fixes(file.toNioPath(), diagnostic));
     }
 
     /** Must be called inside a read action. Null when no server is available for the file. */
@@ -180,6 +227,10 @@ public final class TsLanguageService implements Disposable {
                 servers.remove(root);
                 return null;
             }
+            backend.onDiagnosticsPushed(path -> {
+                VirtualFile pushed = LocalFileSystem.getInstance().findFileByNioFile(path);
+                if (pushed != null && !project.isDisposed()) TsSemanticHighlighter.getInstance(project).schedule(pushed);
+            });
             Server server = new Server(root, backend);
             servers.put(root, server);
             return server;
