@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.10.0
+
+- **Type Info (Ctrl+Shift+P)** — тип имени под курсором: `loginPage` → `LoginPage`, `page` → `Page`.
+- **Go to Type Declaration (Cmd+Shift+B / Ctrl+Shift+B)** — к объявлению типа: `loginPage` → класс `LoginPage`, `page` → интерфейс `Page` Playwright.
+- **«N usages» над классами, функциями, методами и полями** (Code Vision), клик показывает использования. Отключается в Settings | Editor | Inlay Hints | Code Vision.
+- **Постфиксные шаблоны, как в IDEA**: `.const`, `.let` (имя предлагается из выражения и сразу выделено), `.if`, `.not`, `.notnull`, `.null`, `.return`, `.await`, `.par`, `.for`, `.forof`, `.fori`, плюс прежние `.log` / `.error`. Список — Settings | Editor | General | Postfix Completion.
+- **New → Playwright Test**: файл теста в стиле проекта — суффикс `.test.ts` или `.spec.ts`, как уже принято в проекте; `test` и `expect` импортируются из `baseTest.ts` / `fixtures.ts` проекта. Шаблон — Settings | Editor | File and Code Templates | Other | Playwright Test.
+
 ## 1.9.0
 
 Навигация, как в IntelliJ IDEA: плагин разрешает через TypeScript ссылки, которые GigaIDE не понимает (методы Page Object, фикстуры, API Playwright), поэтому штатные функции IDE получили цель:

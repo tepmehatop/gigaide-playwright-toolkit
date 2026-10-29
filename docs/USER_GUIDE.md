@@ -62,7 +62,9 @@ Project: ~/projects/autotests
 - **Cmd+Alt+F7 / Ctrl+Alt+F7** (Show Usages) — то же во всплывающем списке;
 - **Ctrl+Click на объявлении** — список его использований;
 - имя под курсором подсвечивается во всём файле;
-- **Space / Ctrl+Shift+I** (Quick Definition) — код объявления во всплывающем окне.
+- **Space / Ctrl+Shift+I** (Quick Definition) — код объявления во всплывающем окне;
+- **Ctrl+Shift+P** (Type Info) — тип под курсором; **Cmd+Shift+B / Ctrl+Shift+B** — к объявлению типа (`page` → `Page`);
+- над классами, функциями, методами и полями — «N usages», клик показывает использования.
 
 **Structure** — **Cmd+F12 / Ctrl+F12** (всплывающее окно) или окно **Structure**: классы, их поля и методы, функции, тесты файла.
 
@@ -250,7 +252,17 @@ Tools
 
 | `log` | `console.log(…);` |
 
-**Постфиксные шаблоны**: допишите к выражению `.log` (или `.error`) и нажмите **Tab** — `page.url().log` превращается в `console.log(page.url())`.
+**Постфиксные шаблоны**: допишите к выражению ключ и нажмите **Tab**:
+
+| Ключ | Результат |
+|---|---|
+| `.log`, `.error` | `console.log(expr)` |
+| `.const`, `.let` | `const locator = expr;` — имя предложено, его можно сразу перепечатать |
+| `.await`, `.return`, `.not`, `.par` | `await expr`, `return expr;`, `!expr`, `(expr)` |
+| `.if`, `.notnull`, `.null` | `if (expr) { }`, `if (expr != null) { }`, `if (expr == null) { }` |
+| `.forof`, `.for`, `.fori` | `for (const row of rows) { }`, `for (const key in expr) { }`, `for (let i = 0; i < expr.length; i++) { }` |
+
+**Новый тест** — в окне Project правый клик по папке → **New → Playwright Test**: файл с нужным суффиксом (`.test.ts`/`.spec.ts`, как в проекте) и импортом `test`, `expect` из `baseTest.ts` проекта.
 
 Шаблоны можно поменять: **Settings → Editor → Live Templates → Playwright**; постфиксные — **Settings → Editor → General → Postfix Completion**.
 

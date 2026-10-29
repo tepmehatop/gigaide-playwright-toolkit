@@ -52,7 +52,7 @@ intellijPlatform {
     buildSearchableOptions = false
     instrumentCode = false
     pluginConfiguration {
-        changeNotes = "IDEA-like navigation: Ctrl+Click on a declaration shows usages, Show Usages, Find Usages, usages highlighting, Quick Definition - targets resolved with the TypeScript server. See CHANGELOG.md."
+        changeNotes = "Type Info, Go to Type Declaration, usages Code Vision, IDEA postfix templates, New | Playwright Test. See CHANGELOG.md."
         ideaVersion {
             sinceBuild = "251"
             untilBuild = provider { null }

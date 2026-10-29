@@ -39,6 +39,9 @@ interface TsBackend {
     /** Quick fixes for a diagnostic: "Add import from ...", "Add missing function declaration ...". */
     @NotNull CompletableFuture<List<TsLanguageService.Fix>> fixes(@NotNull Path file, @NotNull TsLanguageService.Diagnostic diagnostic);
 
+    /** Declaration of the type of the symbol at the position: page -> interface Page. */
+    @NotNull CompletableFuture<List<TsLanguageService.Location>> typeDefinition(@NotNull Path file, int line, int character);
+
     /** Signatures of the call around the position (parameter info). */
     @NotNull CompletableFuture<TsLanguageService.SignatureHelp> signatureHelp(@NotNull Path file, int line, int character);
 

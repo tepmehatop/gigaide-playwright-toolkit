@@ -223,6 +223,15 @@ public final class TsLanguageService implements Disposable {
         return server.update(file, document).thenCompose(ignored -> server.backend.completions(file.toNioPath(), line, character, trigger));
     }
 
+    /** Must be called inside a read action. Null when no server is available for the file. */
+    public @Nullable CompletableFuture<List<Location>> typeDefinition(@NotNull VirtualFile file, @NotNull Document document, int offset) {
+        Server server = serverFor(file);
+        if (server == null) return null;
+        int line = document.getLineNumber(offset);
+        int character = offset - document.getLineStartOffset(line);
+        return server.update(file, document).thenCompose(ignored -> server.backend.typeDefinition(file.toNioPath(), line, character));
+    }
+
     /** A semantic token: absolute offsets in the document text that was sent with the request. */
     public record SemanticToken(int start, int length, @NotNull String type, @NotNull Set<String> modifiers) {
     }

@@ -92,6 +92,7 @@ final class LspTsBackend implements TsBackend {
         Map<String, Object> capabilities = Map.of(
                 "textDocument", Map.ofEntries(
                         Map.entry("definition", Map.of("linkSupport", true)),
+                        Map.entry("typeDefinition", Map.of("linkSupport", true)),
                         Map.entry("completion", Map.of("completionItem", Map.of("snippetSupport", false,
                                 "resolveSupport", Map.of("properties", List.of("additionalTextEdits", "detail"))), "contextSupport", true)),
                         Map.entry("publishDiagnostics", Map.of()),
@@ -152,6 +153,12 @@ final class LspTsBackend implements TsBackend {
         params.put("textDocument", Map.of("uri", uri(file)));
         params.put("position", Map.of("line", line, "character", character));
         return loaded().thenCompose(ignored -> client.request("textDocument/definition", params)).thenApply(LspTsBackend::parseLocations);
+    }
+
+    @Override
+    public @NotNull CompletableFuture<List<TsLanguageService.Location>> typeDefinition(@NotNull Path file, int line, int character) {
+        Map<String, Object> params = Map.of("textDocument", Map.of("uri", uri(file)), "position", Map.of("line", line, "character", character));
+        return loaded().thenCompose(ignored -> client.request("textDocument/typeDefinition", params)).thenApply(LspTsBackend::parseLocations);
     }
 
     @Override
