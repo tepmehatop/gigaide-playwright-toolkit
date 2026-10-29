@@ -11,7 +11,7 @@
 5. [Параметры прогона](#5-параметры-прогона)
 6. [Trace, скриншоты и отчёт](#6-trace-скриншоты-и-отчёт)
 7. [Отладка](#7-отладка)
-8. [Show Browser и Explore locators](#8-show-browser-и-explore-locators)
+8. [Show Browser, Explore locators, Pick Locator](#8-show-browser-explore-locators-pick-locator)
 9. [Меню Tools → Playwright](#9-меню-tools--playwright)
 10. [Шаблоны кода](#10-шаблоны-кода)
 11. [Настройки](#11-настройки)
@@ -185,6 +185,7 @@ http://localhost:63342/api/file/{path}:{line}
 - **Threads & Variables** — переменные кадра (фикстуры, `this` Page Object), стек вызовов;
 - step over / into / out, Resume, Run to Cursor;
 - Evaluate Expression (Alt+F8), watches, условные брейкпоинты;
+- значения переменных прямо в строках кода серым, как в IDEA (Settings → Debugger → Data Views → Show values inline);
 - подсказка значения при наведении на переменную;
 - в DevTools браузера (F12) — объект `playwright` (`PWDEBUG=console`).
 
@@ -198,7 +199,7 @@ http://localhost:63342/api/file/{path}:{line}
 
 Значит, тест упал раньше этой строки — ошибка выше в консоли.
 
-## 8. Show Browser и Explore locators
+## 8. Show Browser, Explore locators, Pick Locator
 
 **Show Browser** — **Tools → Playwright → Show Browser (Keep Open Between Runs)**. Один видимый браузер не закрывается между прогонами (Run и Debug): видно, на какой странице остановился тест, а повторные запуски быстрее. Закрыть его — **Tools → Playwright → Close Browser**.
 
@@ -217,6 +218,10 @@ http://localhost:63342/api/file/{path}:{line}
 1. Включить Show Browser.
 2. Запустить тест: страница останется открытой.
 3. Ходить курсором по селекторам в Page Object или тесте и смотреть подсветку.
+
+**Pick Locator in Browser** — при включённом Show Browser: правый клик в редакторе → *Pick Locator in Browser* (или Tools → Playwright), затем клик по элементу в браузере. Локатор вставляется у курсора: в кавычках — селектор, вне кавычек — `getByRole(...)` и т. п. Если в браузере ещё нет нужной страницы, откройте её адресной строкой браузера или запустите тест.
+
+**Проверка селекторов** — ошибки в строках `locator("…")`, `click("…")` и в объектах `selectors` подчёркиваются красным: незакрытые скобки XPath, `div >` без продолжения, `[=x]` и т. п.
 
 ## 9. Меню Tools → Playwright
 

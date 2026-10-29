@@ -63,8 +63,8 @@ public final class PwNewTestAction extends AnAction implements DumbAware {
         IdeView view = e.getData(LangDataKeys.IDE_VIEW);
         PsiDirectory directory = view == null ? null : view.getOrChooseDirectory();
         if (project == null || directory == null) return;
-        String suffix = testSuffix(project);
-        String name = Messages.showInputDialog(project, "File name (" + suffix + " is added):", "New Playwright Test",
+        String suffix = testSuffix(project, directory.getVirtualFile());
+        String name = Messages.showInputDialog(project, "File name (" + suffix + " is added unless you type another suffix):", "New Playwright Test",
                 null, "", new InputValidator() {
                     @Override
                     public boolean checkInput(String input) {
@@ -93,25 +93,53 @@ public final class PwNewTestAction extends AnAction implements DumbAware {
         }
     }
 
+    /** The typed name with the project's suffix; a suffix typed by the user ("cart.test.ts", "cart.spec.js") is kept. */
     static @NotNull String fileName(@NotNull String input, @NotNull String suffix) {
         String name = input.trim();
-        for (String known : List.of(".spec.ts", ".test.ts", ".spec.js", ".test.js", ".ts", ".js")) {
-            if (name.endsWith(known)) name = name.substring(0, name.length() - known.length());
+        for (String typed : List.of(".spec.ts", ".test.ts", ".spec.tsx", ".test.tsx", ".spec.js", ".test.js", ".spec.mjs", ".test.mjs")) {
+            if (name.endsWith(typed) && name.length() > typed.length()) return name;
+        }
+        for (String plain : List.of(".ts", ".js")) {
+            if (name.endsWith(plain)) name = name.substring(0, name.length() - plain.length());
         }
         return name + suffix;
     }
 
-    /** ".test.ts" when the project names its tests like that, otherwise Playwright's default ".spec.ts". */
-    static @NotNull String testSuffix(@NotNull Project project) {
-        GlobalSearchScope scope = GlobalSearchScope.projectScope(project);
-        boolean[] test = {false};
-        boolean[] spec = {false};
-        FilenameIndex.processAllFileNames(name -> {
-            if (name.endsWith(".test.ts")) test[0] = true;
-            if (name.endsWith(".spec.ts")) spec[0] = true;
-            return !(test[0] && spec[0]);
-        }, scope, null);
-        return test[0] && !spec[0] ? ".test.ts" : ".spec.ts";
+    private static final java.util.regex.Pattern TEST_MATCH = java.util.regex.Pattern.compile("testMatch\\s*:\\s*([^\\n]*)");
+
+    /**
+     * The suffix of the project's tests: from testMatch of playwright.config (e.g. /.*\\.test\\.ts$/), otherwise the
+     * suffix most test files of the project have (node_modules excluded), otherwise Playwright's default ".spec.ts".
+     */
+    static @NotNull String testSuffix(@NotNull Project project, @Nullable VirtualFile directory) {
+        for (VirtualFile dir = directory; dir != null; dir = dir.getParent()) {
+            for (String config : List.of("playwright.config.ts", "playwright.config.js", "playwright.config.mjs", "playwright.config.cjs")) {
+                VirtualFile file = dir.findChild(config);
+                if (file == null) continue;
+                try {
+                    java.util.regex.Matcher matcher = TEST_MATCH.matcher(new String(file.contentsToByteArray(), StandardCharsets.UTF_8));
+                    if (matcher.find()) {
+                        String match = matcher.group(1);
+                        String ext = match.contains("js") && !match.contains("ts") ? ".js" : ".ts";
+                        if (match.contains("test")) return ".test" + ext;
+                        if (match.contains("spec")) return ".spec" + ext;
+                    }
+                } catch (Exception ignored) {
+                }
+                dir = null;
+                break;
+            }
+            if (dir == null) break;
+        }
+        int[] counts = new int[2];
+        com.intellij.openapi.roots.ProjectFileIndex index = com.intellij.openapi.roots.ProjectFileIndex.getInstance(project);
+        index.iterateContent(file -> {
+            String name = file.getName();
+            if (name.endsWith(".test.ts")) counts[0]++;
+            else if (name.endsWith(".spec.ts")) counts[1]++;
+            return true;
+        }, file -> !file.isDirectory() || !file.getName().equals("node_modules"));
+        return counts[0] > counts[1] ? ".test.ts" : ".spec.ts";
     }
 
     /** test and expect from the project's fixtures file (default or named export), else from @playwright/test. */

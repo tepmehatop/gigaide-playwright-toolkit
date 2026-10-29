@@ -88,7 +88,7 @@ final class PwStackFrame extends XStackFrame {
             XValueChildrenList groups = new XValueChildrenList();
             for (int i = 1; i < scopes.size(); i++) {
                 JsonObject scope = scopes.get(i).getAsJsonObject();
-                groups.addBottomGroup(new PwScopeGroup(session, scope.get("name").getAsString(), scope.get("variablesReference").getAsInt()));
+                groups.addBottomGroup(new PwScopeGroup(session, scope.get("name").getAsString(), scope.get("variablesReference").getAsInt(), getSourcePosition()));
             }
             if (scopes.isEmpty()) {
                 node.addChildren(groups, true);
@@ -97,7 +97,7 @@ final class PwStackFrame extends XStackFrame {
             int locals = scopes.get(0).getAsJsonObject().get("variablesReference").getAsInt();
             PwValue.load(session, locals).whenComplete((values, loadError) -> {
                 XValueChildrenList list = new XValueChildrenList();
-                if (values != null) values.forEach(v -> list.add(v.getName(), v));
+                if (values != null) values.forEach(v -> list.add(v.getName(), v.atFrame(getSourcePosition())));
                 node.addChildren(list, false);
                 node.addChildren(groups, true);
             });
